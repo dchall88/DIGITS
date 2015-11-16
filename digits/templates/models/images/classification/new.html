@@ -1,6 +1,8 @@
 {# Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved. #}
 
 {% from "helper.html" import print_flashes %}
+{% from "helper.html" import print_errors %}
+{% from "helper.html" import mark_errors %}
 
 {% extends "layout.html" %}
 
@@ -20,37 +22,59 @@ New Image Classification Model
 <form id="model-form" action="{{url_for('image_classification_model_create')}}" enctype="multipart/form-data" method="post">
     {{ form.hidden_tag() }}
 
-    {% if form.errors %}
-        <div class="alert alert-danger">
-            {% for field, errors in form.errors.items() %}
-                <li>{{ field }}
-                    <ul>
-                        {% for e in errors %}
-                            <li>{{ e }}</li>
-                        {% endfor %}
-                    </ul>
-                </li>
-            {% endfor %}
-        </div>
-    {% endif %}
+    {{ print_errors(form) }}
 
     <div class="row">
         <div class="col-sm-4">
             <div class="well">
-                <div class="form-group{{' has-error' if form.dataset.errors}}">
+                <div class="form-group{{mark_errors([form.dataset])}}">
                     {{form.dataset.label}}
-                    <span name="dataset_explanation"
-                        class="explanation-tooltip glyphicon glyphicon-question-sign"
-                        data-container="body"
-                        title="Choose the dataset to use for this model."
-                        ></span>
+                    {{form.dataset.tooltip}}
                     {{form.dataset(class='form-control', size=5)}}
+                </div>
+            </div>
+
+            <div class="col">
+                <div class="well">
+                    <label for="{{form.python_layer_from_client.name}}">
+                        {{form.python_layer_from_client}}
+                        {{form.python_layer_from_client.label}}
+                    </label>
+                    <div class="form-group{{' has-error' if form.python_layer_client_file.errors}} python-layer-client-side-file">
+                        {{form.python_layer_client_file.label}}
+                        {{form.python_layer_client_file.tooltip}}
+                        {{form.python_layer_client_file(class='form-control')}}
+                    </div>
+                    <div class="form-group{{' has-error' if form.python_layer_server_file.errors}} python-layer-server-side-file">
+                        {{form.python_layer_server_file.label}}
+                        {{form.python_layer_server_file.tooltip}}
+                        {{form.python_layer_server_file(class='form-control autocomplete_path')}}
+                    </div>
                 </div>
             </div>
         </div>
         <script>
+
+         // Show/home python_layer_file form fields according to the checkbox
+         function python_layer_file_state() {
+             var from_client = $("#python_layer_from_client").prop("checked");
+             if (from_client) {
+                 $(".python-layer-server-side-file").hide();
+                 $(".python-layer-client-side-file").show();
+             }
+             else{
+                 $(".python-layer-server-side-file").show();
+                 $(".python-layer-client-side-file").hide();
+             }
+         }
+
+         $("#python_layer_from_client").click(function() {
+             python_layer_file_state();
+         });
+         python_layer_file_state();
+
 $("#dataset").change(function() {
-        $.ajax("/datasets/summary?job_id=" + $(this).val(),
+        $.ajax("/datasets/images/classification/summary?job_id=" + $(this).val(),
             {
                 type: "GET",
                 }
@@ -71,27 +95,15 @@ $("#dataset").change(function() {
         <div class="col-sm-4">
             <div class="well">
                 <h4>Data Transformations</h4>
-                <div class="form-group{{' has-error' if form.crop_size.errors}}">
+                <div class="form-group{{mark_errors([form.crop_size])}}">
                     {{form.crop_size.label}}
-                    <div class="input-group">
-                        {{form.crop_size(class='form-control', placeholder='none')}}
-                        <span name="crop_size_explanation"
-                            class="input-group-addon explanation-tooltip glyphicon glyphicon-question-sign"
-                            data-container="body"
-                            title="If specified, during training a random square crop will be taken from the input image before using as input for the network."
-                            ></span>
-                    </div>
+                    {{form.crop_size.tooltip}}
+                    {{form.crop_size(class='form-control', placeholder='none')}}
                 </div>
-                <div class="form-group{{' has-error' if form.use_mean.errors}}">
+                <div class="form-group{{mark_errors([form.use_mean])}}">
                     {{form.use_mean.label}}
-                    <div class="input-group">
-                        {{form.use_mean(class='form-control')}}
-                        <span name="use_mean_explanation"
-                            class="input-group-addon explanation-tooltip glyphicon glyphicon-question-sign"
-                            data-container="body"
-                            title="Subtract the mean file for this dataset from each image."
-                            ></span>
-                    </div>
+                    {{form.use_mean.tooltip}}
+                    {{form.use_mean(class='form-control')}}
                 </div>
             </div>
         </div>
@@ -105,84 +117,49 @@ $("#dataset").change(function() {
                 <h4>Solver Options</h4>
 
                 <!-- Length -->
+                <div class="form-group{{mark_errors([form.shuffle])}}" id="shuffle-data" style="display:none;">
+                    <label for={{form.shuffle.name}}>
+                        {{form.shuffle}}
+                        {{form.shuffle.label.text}}
+                    </label>
+                    {{ form.shuffle.tooltip }}
+                </div>
 
-                <div class="form-group{{' has-error' if form.train_epochs.errors}}">
+                <div class="form-group{{mark_errors([form.train_epochs])}}">
                     {{form.train_epochs.label}}
-                    <div class="input-group">
-                        {{form.train_epochs(class='form-control')}}
-                        <span name="train_epochs_explanation"
-                            class="input-group-addon explanation-tooltip glyphicon glyphicon-question-sign"
-                            data-container="body"
-                            title="How many passes through the training data?"
-                            ></span>
-                    </div>
+                    {{form.train_epochs.tooltip}}
+                    {{form.train_epochs(class='form-control')}}
                 </div>
-                <div class="form-group{{' has-error' if form.snapshot_interval.errors}}">
+                <div class="form-group{{mark_errors([form.snapshot_interval])}}">
                     {{form.snapshot_interval.label}}
-                    <div class="input-group">
-                        {{form.snapshot_interval(class='form-control')}}
-                        <span name="snapshot_interval_explanation"
-                            class="input-group-addon explanation-tooltip glyphicon glyphicon-question-sign"
-                            data-container="body"
-                            title="How many epochs of training between taking a snapshot?"
-                            ></span>
-                    </div>
+                    {{form.snapshot_interval.tooltip}}
+                    {{form.snapshot_interval(class='form-control')}}
                 </div>
-                <div class="form-group{{' has-error' if form.val_interval.errors}}">
+                <div class="form-group{{mark_errors([form.val_interval])}}">
                     {{form.val_interval.label}}
-                    <div class="input-group">
-                        {{form.val_interval(class='form-control')}}
-                        <span name="val_interval_explanation"
-                            class="input-group-addon explanation-tooltip glyphicon glyphicon-question-sign"
-                            data-container="body"
-                            title="How many epochs of training between running through one pass of the validation data?"
-                            ></span>
-                    </div>
+                    {{form.val_interval.tooltip}}
+                    {{form.val_interval(class='form-control')}}
                 </div>
                 {# TODO: neat progress bar #}
-                <div class="form-group{{' has-error' if form.random_seed.errors}}">
+                <div class="form-group{{mark_errors([form.random_seed])}}">
                     {{form.random_seed.label}}
-                    <div class="input-group">
-                        {{form.random_seed(class='form-control', placeholder='[none]')}}
-                        <span name="random_seed_explanation"
-                            class="input-group-addon explanation-tooltip glyphicon glyphicon-question-sign"
-                            data-container="body"
-                            title="If you provide a random seed, then back-to-back runs with the same model and dataset should give identical results."
-                            ></span>
-                    </div>
+                    {{form.random_seed.tooltip}}
+                    {{form.random_seed(class='form-control', placeholder='[none]')}}
                 </div>
-                <div class="form-group{{' has-error' if form.batch_size.errors}}">
+                <div class="form-group{{mark_errors([form.batch_size])}}">
                     {{form.batch_size.label}}
-                    <div class="input-group">
-                        {{form.batch_size(class='form-control', placeholder='[network defaults]')}}
-                        <span name="batch_size_explanation"
-                            class="input-group-addon explanation-tooltip glyphicon glyphicon-question-sign"
-                            data-container="body"
-                            title="How many images to process at once. If blank, values are used from the network definition."
-                            ></span>
-                    </div>
+                    {{form.batch_size.tooltip}}
+                    {{form.batch_size(class='form-control', placeholder='[network defaults]')}}
                 </div>
-                <div class="form-group{{' has-error' if form.solver_type.errors}}">
+                <div class="form-group{{mark_errors([form.solver_type])}}">
                     {{form.solver_type.label}}
-                    <div class="input-group">
-                        {{form.solver_type(class='form-control')}}
-                        <span name="solver_type_explanation"
-                            class="input-group-addon explanation-tooltip glyphicon glyphicon-question-sign"
-                            data-container="body"
-                            title="What type of solver will be used??"
-                            ></span>
-                    </div>
+                    {{form.solver_type.tooltip}}
+                    {{form.solver_type(class='form-control')}}
                 </div>
-                <div class="form-group{{' has-error' if form.learning_rate.errors}}">
+                <div class="form-group{{mark_errors([form.learning_rate])}}">
                     {{form.learning_rate.label}}
-                    <div class="input-group">
-                        {{form.learning_rate(class='form-control learning-rate-option')}}
-                        <span name="learning_rate_explanation"
-                            class="input-group-addon explanation-tooltip glyphicon glyphicon-question-sign"
-                            data-container="body"
-                            title="Affects how quickly the network learns. If you are getting NaN for your loss, you probably need to lower this value."
-                            ></span>
-                    </div>
+                    {{form.learning_rate.tooltip}}
+                    {{form.learning_rate(class='form-control learning-rate-option')}}
                 </div>
 
                 <p>
@@ -206,57 +183,58 @@ showHideAdvancedLROptions();
                 </script>
 
                 <div id="advanced-lr-options" style="display:none;">
-                    <div class="form-group{{' has-error' if form.lr_policy.errors}}">
+
+                    <div class="form-group{{mark_errors([form.lr_policy])}}">
                         {{form.lr_policy.label}}
                         {{form.lr_policy(class='form-control learning-rate-option')}}
                     </div>
 
-                    <div class="form-group{{' has-error' if form.lr_step_size.errors}}">
+                    <div class="form-group{{mark_errors([form.lr_step_size])}}">
                         {{form.lr_step_size.label}}
                         <div class="input-group">
                             {{form.lr_step_size(class='form-control learning-rate-option')}}
                             <span class="input-group-addon">%</span>
                         </div>
                     </div>
-                    <div class="form-group{{' has-error' if form.lr_step_gamma.errors}}">
+                    <div class="form-group{{mark_errors([form.lr_step_gamma])}}">
                         {{form.lr_step_gamma.label}}
                         {{form.lr_step_gamma(class='form-control learning-rate-option')}}
                     </div>
-                    <div class="form-group{{' has-error' if form.lr_multistep_values.errors}}">
+                    <div class="form-group{{mark_errors([form.lr_multistep_values])}}">
                         {{form.lr_multistep_values.label}}
                         <div class="input-group">
                             {{form.lr_multistep_values(class='form-control learning-rate-option')}}
                             <span class="input-group-addon">%</span>
                         </div>
                     </div>
-                    <div class="form-group{{' has-error' if form.lr_multistep_gamma.errors}}">
+                    <div class="form-group{{mark_errors([form.lr_multistep_gamma])}}">
                         {{form.lr_multistep_gamma.label}}
                         {{form.lr_multistep_gamma(class='form-control learning-rate-option')}}
                     </div>
-                    <div class="form-group{{' has-error' if form.lr_exp_gamma.errors}}">
+                    <div class="form-group{{mark_errors([form.lr_exp_gamma])}}">
                         {{form.lr_exp_gamma.label}}
                         {{form.lr_exp_gamma(class='form-control learning-rate-option')}}
                     </div>
-                    <div class="form-group{{' has-error' if form.lr_inv_gamma.errors}}">
+                    <div class="form-group{{mark_errors([form.lr_inv_gamma])}}">
                         {{form.lr_inv_gamma.label}}
                         {{form.lr_inv_gamma(class='form-control learning-rate-option')}}
                     </div>
-                    <div class="form-group{{' has-error' if form.lr_inv_power.errors}}">
+                    <div class="form-group{{mark_errors([form.lr_inv_power])}}">
                         {{form.lr_inv_power.label}}
                         {{form.lr_inv_power(class='form-control learning-rate-option')}}
                     </div>
-                    <div class="form-group{{' has-error' if form.lr_poly_power.errors}}">
+                    <div class="form-group{{mark_errors([form.lr_poly_power])}}">
                         {{form.lr_poly_power.label}}
                         {{form.lr_poly_power(class='form-control learning-rate-option')}}
                     </div>
-                    <div class="form-group{{' has-error' if form.lr_sigmoid_step.errors}}">
+                    <div class="form-group{{mark_errors([form.lr_sigmoid_step])}}">
                         {{form.lr_sigmoid_step.label}}
                         <div class="input-group">
                             {{form.lr_sigmoid_step(class='form-control learning-rate-option')}}
                             <span class="input-group-addon">%</span>
                         </div>
                     </div>
-                    <div class="form-group{{' has-error' if form.lr_sigmoid_gamma.errors}}">
+                    <div class="form-group{{mark_errors([form.lr_sigmoid_gamma])}}">
                         {{form.lr_sigmoid_gamma.label}}
                         {{form.lr_sigmoid_gamma(class='form-control learning-rate-option')}}
                     </div>
@@ -365,12 +343,12 @@ showHideAdvancedLROptions();
         </div>
         <div class="col-sm-8">
             <script>
-function customizeNetwork(network, snapshot_list) {
-    function fillCustomTab(network, snapshot_list) {
+function customizeNetwork(network, snapshot_list, framework) {
+    function fillCustomTab(network, snapshot_list, framework) {
         data = null;
         if (snapshot_list)
             data = {'snapshot_epoch': $('#'+snapshot_list).val()};
-        $.ajax("{{url_for('models_customize')}}?network=" + network,
+        $.ajax("{{url_for('models_customize')}}?network=" + network+"&framework="+framework,
                 {
                     type: "POST",
                     data: data
@@ -390,101 +368,176 @@ function customizeNetwork(network, snapshot_list) {
                 errorAlert(data);
                 });
         $('#network-tabs a:last').tab('show');
+        $('#customFramework a[href="'+"#"+framework+"_custom"+'"]').tab('show');
     }
+    if (!framework)
+        var $tab = $('#stdnetRole'), $active = $tab.find('.active'), framework = $active.attr('id');
 
     if ($('textarea[name=custom_network]').val() != "") {
         bootbox.confirm(
                 'This will overwrite data in the Custom Network tab. Continue?',
-                function(result) { if (result) fillCustomTab(network, snapshot_list); }
+                function(result) { if (result) fillCustomTab(network, snapshot_list, framework); }
                 );
     } else {
-        fillCustomTab(network, snapshot_list);
+        fillCustomTab(network, snapshot_list, framework);
     }
+}
+
+var frameworks = {};
+{% for fw in frameworks %}
+framework = {
+    name : '{{ fw.get_name() }}',
+    can_shuffle : '{{ fw.can_shuffle_data() }}'=='True'
+    };
+frameworks['{{ fw.get_id() }}'] = framework;
+{% endfor %}
+
+function setFramework(fwid)
+{
+    $('#framework').val(fwid);
+    if (frameworks[fwid].can_shuffle)
+        $("#shuffle-data").show();
+    else
+        $("#shuffle-data").hide();
+    if (fwid == 'torch')
+        $("#torch-warning").show();
+    else
+        $("#torch-warning").hide();
+    $('#stdnetRole a[href="'+"#"+fwid+"_standard"+'"]').tab('show');
+    $('#customFramework a[href="'+"#"+fwid+"_custom"+'"]').tab('show');
 }
             </script>
 
+            <div id="torch-warning" class="alert alert-warning" style="display:none;">
+                <b>NOTE:</b> Torch7 is currently supported as an experimental feature in DIGITS. The following limitations apply:
+                <ul>
+                    <li>Multi-GPU training is not supported</li>
+                    <li>Models don't automatically adjust to images with different sizes/channels</li>
+                    <li>Model fine tuning is not supported</li>
+                </ul>
+            </div>
             <ul class="nav nav-tabs" id="network-tabs">
                 <li class="active"><a href="#network-tab-standard" data-toggle="tab">Standard Networks</a></li>
                 <li><a href="#network-tab-previous" data-toggle="tab">Previous Networks</a></li>
                 <li><a href="#network-tab-custom" data-toggle="tab">Custom Network</a></li>
             </ul>
             <div class="tab-content well">
+                <div style="display:none;">{{form.framework(class='form-control')}}</div>
                 <div id="network-tab-standard" class="tab-pane active">
-                    <table class="table">
-                        <tr>
-                            <th>Network</th>
-                            <th>Details</th>
-                            <th>Intended image size</th>
-                            <th></th>
-                        </tr>
-                        {% for network in form.standard_networks %}
-                        <tr>
-                            <td>{{network}} {{network.label}}</td>
-                            {% if network.data == 'lenet' %}
-                            <td>
-                                <a href="http://yann.lecun.com/exdb/publis/pdf/lecun-98.pdf" target="_blank">Original paper</a>
-                                [1998]
-                            </td>
-                            <td>28x28 (gray)</td>
-                            {% elif network.data == 'alexnet' %}
-                            <td>
-                                <a href="http://papers.nips.cc/paper/4824-imagenet-classification-with-deep-convolutional" target="_blank">Original paper</a>
-                                [2012]
-                            </td>
-                            <td>256x256</td>
-                            {% elif network.data == 'vgg-16' %}
-                            <td>
-                                <a href="http://arxiv.org/abs/1409.1556" target="_blank">Original paper</a>
-                                [2014]
-                            </td>
-                            <td>256x256</td>
-                            {% elif network.data == 'googlenet' %}
-                            <td>
-                                <a href="http://arxiv.org/abs/1409.4842" target="_blank">Original paper</a>
-                                [2014]
-                            </td>
-                            <td>256x256</td>
-                            {% else %}
-                            <td></td><td>?</td>
-                            {% endif %}
-                            <td><a class="btn btn-sm" onClick="customizeNetwork('{{network.data}}');">Customize</a></td>
-                        </tr>
+                    <ul class="nav nav-tabs" id="stdnetRole">
+                        {% for fw in frameworks %}
+                        <li id="{{ fw.get_id() }}"><a href="#{{ fw.get_id() }}_standard" data-toggle="tab">{{ fw.get_name() }}</a></li>
                         {% endfor %}
-                    </table>
-
+                    </ul>
+                    <div id="network-tab-standard-contents" class="tab-pane active">
+                        <script>
+                            $('#stdnetRole li').first().addClass("active");
+                            $('#stdnetRole li').on('click', function(e) {
+                                 $(this).addClass('active');
+                                 $(this).siblings().removeClass('active');
+                                 setFramework($(this).attr('id'));
+                            });
+                        </script>
+                        <table class="table">
+                            <tr>
+                                <th>Network</th>
+                                <th>Details</th>
+                                <th>Intended image size</th>
+                                <th></th>
+                            </tr>
+                            {% for network in form.standard_networks %}
+                            <tr>
+                                <td>{{network}} {{network.label}}</td>
+                                {% if network.data == 'lenet' %}
+                                <td>
+                                    <a href="http://yann.lecun.com/exdb/publis/pdf/lecun-98.pdf" target="_blank">Original paper</a>
+                                    [1998]
+                                </td>
+                                <td>28x28 (gray)</td>
+                                {% elif network.data == 'alexnet' %}
+                                <td>
+                                    <a href="http://papers.nips.cc/paper/4824-imagenet-classification-with-deep-convolutional" target="_blank">Original paper</a>
+                                    [2012]
+                                </td>
+                                <td>256x256</td>
+                                {% elif network.data == 'vgg-16' %}
+                                <td>
+                                    <a href="http://arxiv.org/abs/1409.1556" target="_blank">Original paper</a>
+                                    [2014]
+                                </td>
+                                <td>256x256</td>
+                                {% elif network.data == 'googlenet' %}
+                                <td>
+                                    <a href="http://arxiv.org/abs/1409.4842" target="_blank">Original paper</a>
+                                    [2014]
+                                </td>
+                                <td>256x256</td>
+                                {% else %}
+                                <td></td><td>?</td>
+                                {% endif %}
+                                <td><a class="btn btn-sm" onClick="customizeNetwork('{{network.data}}');">Customize</a></td>
+                            </tr>
+                            {% endfor %}
+                        </table>
+                    </div>
                 </div>
                 <div id="network-tab-previous" class="tab-pane">
-                    <table class="table">
-                        <tr>
-                            <th>Network</th>
-                            <th>Pretrained Model</th>
-                            <th></th>
-                        </tr>
-                        {% for network in form.previous_networks %}
-                        <tr>
-                            <td>
-                                {{network}}
-                                {{network.label}}
-                                <a href="{{url_for("models_show", job_id=network.data)}}" target="_blank">View</a>
-                            </td>
-                            <td>
-                                {% set snapshot_list = previous_network_snapshots[loop.index0] %}
-                                {% if snapshot_list|length %}
-                                <select class="form-control" id="{{network.data}}-snapshot" name="{{network.data}}-snapshot">
-                                    {% for each_epoch in snapshot_list %}
-                                    <option value="{{each_epoch[0]}}">{{each_epoch[1]}}</option>
-                                    {% endfor %}
-                                </select>
-                                {% endif %}
-                            </td>
-                            <td><a class="btn btn-sm" onClick="customizeNetwork('{{network.data}}', '{{network.data}}-snapshot');">Customize</a></td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td><i>None</i></td>
-                        </tr>
+
+                    <div class="tab-content">
+                        {% set batch_size = 10 %}
+                        {% for batch in form.previous_networks|batch(batch_size) %}
+                        {% set batch_loop_index = loop.index0 %}
+                        <div class="tab-pane{{' active' if loop.index==1}}" id="previous_networks-page-{{loop.index}}">
+
+                            <table class="table">
+                                <tr>
+                                    <th>Network</th>
+                                    <th>Pretrained Model</th>
+                                    <th></th>
+                                </tr>
+                                {% for network in batch %}
+                                {% set inner_index = batch_loop_index * batch_size + loop.index0 %}
+                                {% set previous_job = previous_networks_fullinfo[inner_index] %}
+                                <tr>
+                                    <td>
+                                        {{network}}
+                                        {{network.label}}
+                                        <a href="{{url_for("models_show", job_id=network.data)}}" target="_blank">View</a>
+                                        <span class="badge">{{previous_job.train_task().get_framework_id()}}</span>
+                                    </td>
+                                    <td>
+                                        {% set snapshot_list = previous_network_snapshots[inner_index] %}
+                                        {% if snapshot_list|length %}
+                                        <select class="form-control" id="{{network.data}}-snapshot" name="{{network.data}}-snapshot">
+                                            {% for each_epoch in snapshot_list %}
+                                            <option value="{{each_epoch[0]}}">{{each_epoch[1]}}</option>
+                                            {% endfor %}
+                                        </select>
+                                        {% endif %}
+                                    </td>
+                                    <td><a class="btn btn-sm" onClick="customizeNetwork('{{network.data}}', '{{network.data}}-snapshot', '{{previous_job.train_task().get_framework_id()}}' );">Customize</a></td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td><i>None</i></td>
+                                </tr>
+                                {% endfor %}
+                            </table>
+
+                        </div>
                         {% endfor %}
-                    </table>
+                    </div>
+
+                    {% if form.previous_networks.choices|length > batch_size %}
+                    <div class="text-center">
+                        <ul class="pagination">
+                            {% for i in range((form.previous_networks.choices|length/batch_size)|round(0,'ceil')|int) %}
+                            <li class="{{'active' if i==0}}"><a href="#previous_networks-page-{{i+1}}" data-toggle="tab">{{i+1}}</a></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+
                 </div>
                 <script>
                     // hide some buttons and form elements
@@ -507,6 +560,8 @@ function customizeNetwork(network, snapshot_list) {
                             $prevtab_prev_clicked_tr.find(".btn.btn-sm").css('visibility', 'hidden');
                             $prevtab_prev_clicked_tr.find(".form-control").css('visibility', 'hidden');
                         }
+                        var framework_badge = $(this).parents('td').find(".badge").text();
+                        setFramework(framework_badge);  //sets the framework value based on the job selected in previous networks tab.
                         $(this).parents('tr').find(".btn.btn-sm").css('visibility', 'visible');
                         $(this).parents('tr').find(".form-control").css('visibility', 'visible');
                         $prevtab_prev_clicked_tr = $(this).parents('tr');
@@ -526,12 +581,27 @@ function customizeNetwork(network, snapshot_list) {
 
                 </script>
                 <div id="network-tab-custom" class="tab-pane">
+                    <ul class="nav nav-tabs" id="customFramework">
+                        {% for fw in frameworks %}
+                        <li id="{{ fw.get_id() }}"><a href="#{{ fw.get_id() }}_custom" data-toggle="tab">{{ fw.get_name() }}</a></li>
+                        {% endfor %}
+                    </ul>
+                    <br>
                     <script>
+                        $('#customFramework li').first().addClass("active");
+                        $('#customFramework li').on('click', function(e) {
+                                 $(this).addClass('active');
+                                 $(this).siblings().removeClass('active');
+                                 setFramework($(this).attr('id'));
+
+                            });
+
 function visualizeNetwork() {
-    $.ajax("{{url_for('models_visualize_network')}}",
+    framework = $('#framework').val();
+    $.ajax("{{url_for('models_visualize_network')}}?framework="+framework,
         {
             type: "POST",
-            data: $("#custom_network").serialize()
+            data: $('#custom_network').serialize()
             }
         )
     .done(function(data) {
@@ -546,49 +616,24 @@ function visualizeNetwork() {
     return false;
 }
                     </script>
-                    <div class="form-group{{' has-error' if form.custom_network.errors}}">
-                        {{form.custom_network.label}}
-                        <div id="custom_network_explanation" style="display:none;">
-                            <h1>Specifying a custom network</h1>
-                            <p>
-                            You should enter a train_val network here. Some cleanup is done for you automatically:
-                            <ul>
-                                <li>
-                                The <i>num_output</i> for each <b>InnerProduct</b> layer which is a network output gets set to the number of labels in the chosen dataset.
-                                </li>
-                                <li>
-                                Any <b>Accuracy</b> layers with <i>top_k</i> &gt;= num_labels is removed automatically.
-                                </li>
-                            </ul>
-                            </p>
-                            The deploy network will be created for you automatically. Once caffe implements their "all-in-one" nets feature, you will be able to specify which layers to include in the deploy file. Until then, these things are done automatically:
-                            <ul>
-                                <li>
-                                The last <b>SoftmaxWithLoss</b> layer is replaced with a <b>Softmax</b> layer.
-                                </li>
-                                <li>
-                                All other loss layers and accuracy layers are removed.
-                                </li>
-                            </ul>
-                            </p>
-                        </div>
-                        <a href=# onClick="bootbox.alert($('#custom_network_explanation').html()); return false;"><span class="glyphicon glyphicon-question-sign"></span></a>
-                        <div class="pull-right">
-                            <a href=# class="btn btn-info" onClick="return visualizeNetwork();">Visualize</a>
-                        </div>
-                        {{form.custom_network(class='form-control', rows=10)}}
-                    </div>
-                    <div class="form-group{{' has-error' if form.custom_network_snapshot.errors}}">
-                        {{form.custom_network_snapshot.label}}
-                        <div class="input-group">
-                            {{form.custom_network_snapshot(class='form-control')}}
-                            <span name="pretrained_model_explanation"
-                                class="input-group-addon explanation-tooltip glyphicon glyphicon-question-sign"
-                                data-container="body"
-                                title="Path to pretrained model file. Only edit this field if you understand how fine-tuning works in caffe"
-                            ></span>
+                       <div class="tab-content" id="custom_textareas">
 
+                                <div class="form-group{{mark_errors([form.custom_network])}}">
+                                    {{form.custom_network.label}}
+                                    {{form.custom_network.explanation(file='/models/images/classification/custom_network_explanation.html')}}
+                                    <div class="pull-right">
+                                        <a href=# class="btn btn-info" onClick="return visualizeNetwork();">Visualize</a>
+                                    </div>
+                                    {{form.custom_network(class='form-control', rows=10)}}
+                                </div>
                         </div>
+                        <script>$(this).addClass('active');
+                            $('#custom_textareas div:first').addClass('tab-pane active') // Select first tab
+                        </script>
+                    <div class="form-group{{mark_errors([form.custom_network_snapshot])}}">
+                        {{form.custom_network_snapshot.label}}
+                        {{form.custom_network_snapshot.tooltip}}
+                        {{form.custom_network_snapshot(class='form-control autocomplete_path')}}
                     </div>
                 </div>
             </div>
@@ -609,7 +654,7 @@ $('#network-tabs a[href="#network-tab-'+$("#method").val()+'"]').tab('show');
     <div class="row">
         <div class="col-sm-6 col-sm-offset-3 well">
             {% if form.select_gpu.choices|length > 2 and not multi_gpu %}
-            <div class="form-group{{' has-error' if form.select_gpu.errors}}">
+            <div class="form-group{{mark_errors([form.select_gpu])}}">
                 <b>{{form.select_gpu.label.text}}</b><br>
                 {% for choice in form.select_gpu %}
                 <div class="radio">
@@ -622,18 +667,14 @@ $('#network-tabs a[href="#network-tab-'+$("#method").val()+'"]').tab('show');
             </div>
             {% endif %}
             {% if form.select_gpus.choices| length > 1 and multi_gpu %}
-            <div class="form-group{{' has-error' if form.select_gpu_count.errors}}">
+            <div class="form-group{{mark_errors([form.select_gpu_count])}}">
                 {{form.select_gpu_count.label}}
                 {{form.select_gpu_count(class='form-control')}}
             </div>
             <p class="text-center"><i>or</i></p>
-            <div class="form-group{{' has-error' if form.select_gpus.errors}}">
+            <div class="form-group{{mark_errors([form.select_gpus])}}">
                 {{form.select_gpus.label}}
-                <span name="select_gpus_explanation"
-                    class="explanation-tooltip glyphicon glyphicon-question-sign"
-                    data-container="body"
-                    title="The job won't start until all of the chosen GPUs are available."
-                    ></span>
+                {{form.select_gpus.tooltip}}
                 {{form.select_gpus(class='form-control', size=4)}}
             </div>
             <script type="text/javascript">
@@ -642,22 +683,28 @@ $('#network-tabs a[href="#network-tab-'+$("#method").val()+'"]').tab('show');
                 $("#select_gpu_count").change(function(){ $("#select_gpus").val(null);});
             </script>
             {% endif %}
-            <div class="form-group{{' has-error' if form.model_name.errors}}">
+            <div class="form-group{{mark_errors([form.model_name])}}">
                 {{form.model_name.label}}
-                <div class="input-group">
-                    {{form.model_name(class='form-control')}}
-                    <span name="model_name_explanation"
-                        class="input-group-addon explanation-tooltip glyphicon glyphicon-question-sign"
-                        data-container="body"
-                        title="An identifier, later used to refer to this model in the Application."
-                    ></span>
-
-                </div>
+                {{form.model_name.tooltip}}
+                {{form.model_name(class='form-control')}}
             </div>
             <input type="submit" name="create-model" class="btn btn-primary" value="Create">
         </div>
     </div>
 
 </form>
+
+<script>
+if($("input:radio[name=previous_networks]").is(":checked")) {
+    if (frameworks[$prevtab_prev_clicked_tr.find(".badge").text()].can_shuffle)
+        $("#shuffle-data").show();
+    else
+        $("#shuffle-data").hide();
+}
+
+//Below two lines are required to show the same tab (that was selected before submitting the form) after the page validation fails i.e., preserving the status of window even after page validation fails.
+framework = $('#framework').val();
+$('#customFramework a[href="'+"#"+framework+"_custom"+'"]').tab('show');
+</script>
 
 {% endblock %}

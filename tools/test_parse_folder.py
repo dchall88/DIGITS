@@ -4,9 +4,12 @@ import os
 import tempfile
 import shutil
 import itertools
+import platform
 
 from nose.tools import raises, assert_raises
 import mock
+import numpy as np
+import PIL.Image
 
 from . import parse_folder as _
 
@@ -25,7 +28,10 @@ class TestValidateFolder():
 
     @classmethod
     def tearDownClass(cls):
-        shutil.rmtree(cls.tmpdir)
+        try:
+            shutil.rmtree(cls.tmpdir)
+        except:
+            pass
 
     def test_dir(self):
         assert _.validate_folder(self.tmpdir) == True
@@ -47,7 +53,10 @@ class TestValidateOutputFile():
 
     @classmethod
     def tearDownClass(cls):
-        shutil.rmtree(cls.tmpdir)
+        try:
+            shutil.rmtree(cls.tmpdir)
+        except:
+            pass
 
     def test_missing_file(self):
         assert _.validate_output_file(None) == True, 'all new files should be valid'
@@ -206,15 +215,13 @@ class TestCalculatePercentages():
 class TestParseWebListing():
 
     def test_non_url(self):
-        """parse_web_listing with bad url"""
         for url in ['not-a-url', 'http://not-a-url', 'https://not-a-url']:
             yield self.check_url_raises, url
 
     def check_url_raises(self, url):
         assert_raises(Exception, _.parse_web_listing, url)
 
-    def test_parse_web_listing(self):
-        """parse_web_listing check output"""
+    def test_mock_url(self):
         for content, dirs, files in [
                 # Nothing
                 ('', [], []),
@@ -273,3 +280,27 @@ class TestSplitIndices():
 
         assert abs(ideala-idxa) <= 2, 'split should be close to {}, is {}'.format(ideala, idxa)
         assert abs(idealb-idxb) <= 2, 'split should be close to {}, is {}'.format(idealb, idxb)
+
+class TestParseFolder():
+
+    def test_all_train(self):
+        tmpdir = tempfile.mkdtemp()
+        img = PIL.Image.fromarray(np.zeros((10,10,3), dtype='uint8'))
+        classes = ['A','B','C']
+        for cls in classes:
+            os.makedirs(os.path.join(tmpdir, cls))
+            img.save(os.path.join(tmpdir, cls, 'image1.png'))
+            img.save(os.path.join(tmpdir, cls, 'image2.jpg'))
+
+        labels_file = os.path.join(tmpdir, 'labels.txt')
+        train_file = os.path.join(tmpdir, 'train.txt')
+
+        _.parse_folder(tmpdir, labels_file, train_file=train_file,
+                percent_train=100, percent_val=0, percent_test=0)
+
+        with open(labels_file) as infile:
+            parsed_classes = [line.strip() for line in infile]
+            assert parsed_classes == classes, '%s != %s' % (parsed_classes, classes)
+
+        shutil.rmtree(tmpdir)
+

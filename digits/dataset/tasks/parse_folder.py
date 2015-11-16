@@ -114,7 +114,7 @@ class ParseFolderTask(Task):
         return None
 
     @override
-    def task_arguments(self, resources):
+    def task_arguments(self, resources, env):
         args = [sys.executable, os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(digits.__file__))),
             'tools', 'parse_folder.py'),
@@ -148,16 +148,7 @@ class ParseFolderTask(Task):
         match = re.match(r'Progress: ([-+]?[0-9]*\.?[0-9]+(e[-+]?[0-9]+)?)', message)
         if match:
             self.progress = float(match.group(1))
-            socketio.emit('task update',
-                    {
-                        'task': self.html_id(),
-                        'update': 'progress',
-                        'percentage': int(round(100*self.progress)),
-                        'eta': utils.time_filters.print_time_diff(self.est_done()),
-                        },
-                    namespace='/jobs',
-                    room=self.job_id,
-                    )
+            self.emit_progress_update()
             return True
 
         # totals

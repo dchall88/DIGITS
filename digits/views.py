@@ -1,14 +1,16 @@
 # Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
 
-import os
 import json
 import traceback
+import glob
+import platform
 
 import flask
 from werkzeug import HTTP_STATUS_CODES
 import werkzeug.exceptions
 from flask.ext.socketio import join_room, leave_room
 
+import digits
 from . import dataset, model
 from config import config_value
 from webapp import app, socketio, scheduler, autodoc
@@ -16,6 +18,7 @@ import dataset.views
 import model.views
 from digits.utils import errors
 from digits.utils.routing import request_wants_json
+from digits.log import logger
 
 @app.route('/index.json', methods=['GET'])
 @app.route('/', methods=['GET'])
@@ -37,12 +40,17 @@ def home():
     completed_models    = get_job_list(model.ModelJob, False)
 
     if request_wants_json():
-        return flask.jsonify({
-            'datasets': [j.json_dict()
-                for j in running_datasets + completed_datasets],
-            'models': [j.json_dict()
-                for j in running_models + completed_models],
-            })
+        data = {
+                'version': digits.__version__,
+                'jobs_dir': config_value('jobs_dir'),
+                'datasets': [j.json_dict()
+                    for j in running_datasets + completed_datasets],
+                'models': [j.json_dict()
+                    for j in running_models + completed_models],
+                }
+        if config_value('server_name'):
+            data['server_name'] = config_value('server_name')
+        return flask.jsonify(data)
     else:
         new_dataset_options = [
                 ('Images', [
@@ -50,6 +58,11 @@ def home():
                         'title': 'Classification',
                         'id': 'image-classification',
                         'url': flask.url_for('image_classification_dataset_new'),
+                        },
+                    {
+                        'title': 'Other',
+                        'id': 'image-generic',
+                        'url': flask.url_for('generic_image_dataset_new'),
                         },
                     ])
                 ]
@@ -59,6 +72,11 @@ def home():
                         'title': 'Classification',
                         'id': 'image-classification',
                         'url': flask.url_for('image_classification_model_new'),
+                        },
+                    {
+                        'title': 'Other',
+                        'id': 'image-generic',
+                        'url': flask.url_for('generic_image_model_new'),
                         },
                     ])
                 ]
@@ -70,6 +88,8 @@ def home():
                 new_model_options   = new_model_options,
                 running_models      = running_models,
                 completed_models    = completed_models,
+                total_gpu_count     = len(scheduler.resources['gpus']),
+                remaining_gpu_count = sum(r.remaining() for r in scheduler.resources['gpus']),
                 )
 
 def get_job_list(cls, running):
@@ -103,15 +123,29 @@ def show_job(job_id):
 @autodoc('jobs')
 def edit_job(job_id):
     """
-    Edit the name of a job
+    Edit a job's name and/or notes
     """
     job = scheduler.get_job(job_id)
     if job is None:
         raise werkzeug.exceptions.NotFound('Job not found')
 
-    old_name = job.name()
-    job._name = flask.request.form['job_name']
-    return 'Changed job name from "%s" to "%s"' % (old_name, job.name())
+    # Edit name
+    if 'job_name' in flask.request.form:
+        name = flask.request.form['job_name'].strip()
+        if not name:
+            raise werkzeug.exceptions.BadRequest('name cannot be blank')
+        job._name = name
+        logger.info('Set name to "%s".' % job.name(), job_id=job.id())
+
+    # Edit notes
+    if 'job_notes' in flask.request.form:
+        notes = flask.request.form['job_notes'].strip()
+        if not notes:
+            notes = None
+        job._notes = notes
+        logger.info('Updated notes.', job_id=job.id())
+
+    return '%s updated.' % job.job_type()
 
 @app.route('/datasets/<job_id>/status', methods=['GET'])
 @app.route('/models/<job_id>/status', methods=['GET'])
@@ -131,6 +165,21 @@ def job_status(job_id):
         result['name'] = job.name()
         result['type'] = job.job_type()
     return json.dumps(result)
+
+@app.route('/job_management', methods=['GET'])
+@autodoc('util')
+def job_management():
+    """
+    Return the jobs management page
+
+    """
+
+    running_datasets    = get_job_list(dataset.DatasetJob, True)
+    running_models      = get_job_list(model.ModelJob, True)
+
+    return flask.render_template('job_management.html',
+                                 running_job = running_datasets + running_models,
+                             )
 
 @app.route('/datasets/<job_id>', methods=['DELETE'])
 @app.route('/models/<job_id>', methods=['DELETE'])
@@ -168,6 +217,30 @@ def abort_job(job_id):
         return 'Job aborted.'
     else:
         raise werkzeug.exceptions.Forbidden('Job not aborted')
+
+@app.route('/clone/<clone>', methods=['POST', 'GET'])
+@autodoc('jobs')
+def clone_job(clone):
+    """
+    Clones a job with the id <clone>, populating the creation page with data saved in <clone>
+    """
+
+    ## <clone> is the job_id to clone
+
+    job = scheduler.get_job(clone)
+    if job is None:
+        raise werkzeug.exceptions.NotFound('Job not found')
+
+    if isinstance(job, dataset.ImageClassificationDatasetJob):
+        return flask.redirect(flask.url_for('image_classification_dataset_new') + '?clone=' + clone)
+    if isinstance(job, dataset.GenericImageDatasetJob):
+        return flask.redirect(flask.url_for('generic_image_dataset_new') + '?clone=' + clone)
+    if isinstance(job, model.ImageClassificationModelJob):
+        return flask.redirect(flask.url_for('image_classification_model_new') + '?clone=' + clone)
+    if isinstance(job, model.GenericImageModelJob):
+        return flask.redirect(flask.url_for('generic_image_model_new') + '?clone=' + clone)
+    else:
+        raise werkzeug.exceptions.BadRequest('Invalid job type')
 
 ### Error handling
 
@@ -208,7 +281,8 @@ def handle_error(e):
 # Register this handler for all error codes
 # Necessary for flask<=0.10.1
 for code in HTTP_STATUS_CODES:
-    app.register_error_handler(code, handle_error)
+    if code not in [301]:
+        app.register_error_handler(code, handle_error)
 
 ### File serving
 
@@ -222,35 +296,42 @@ def serve_file(path):
     and this path will never be used
     """
     jobs_dir = config_value('jobs_dir')
-    path = os.path.normpath(os.path.join(jobs_dir, path))
+    return flask.send_from_directory(jobs_dir, path)
 
-    # Don't allow path manipulation
-    if not os.path.commonprefix([path, jobs_dir]).startswith(jobs_dir):
-        raise werkzeug.exceptions.Forbidden('Path manipulation not allowed')
+### Path Completion
 
-    if not os.path.exists(path):
-        raise werkzeug.exceptions.NotFound('File not found')
-    if os.path.isdir(path):
-        raise werkzeug.exceptions.Forbidden('Folder cannot be served')
+@app.route('/autocomplete/path', methods=['GET'])
+@autodoc('util')
+def path_autocomplete():
+    """
+    Return a list of paths matching the specified preamble
 
-    with open(path, 'r') as infile:
-        response = flask.make_response(infile.read())
-        response.headers["Content-Disposition"] = "attachment; filename=%s" % os.path.basename(path)
-        return response
+    """
+    path = flask.request.args.get('query','')
+    suggestions = glob.glob(path+"*")
+    if platform.system() == 'Windows':
+        # on windows, convert backslashes with forward slashes
+        suggestions = [p.replace('\\', '/') for p in suggestions]
+
+    result = {
+        "suggestions": suggestions
+    }
+
+    return json.dumps(result)
 
 ### SocketIO functions
 
 ## /home
 
 @socketio.on('connect', namespace='/home')
-def on_connect():
+def on_connect_home():
     """
     Somebody connected to the homepage
     """
     pass
 
 @socketio.on('disconnect', namespace='/home')
-def on_disconnect():
+def on_disconnect_home():
     """
     Somebody disconnected from the homepage
     """
@@ -259,20 +340,21 @@ def on_disconnect():
 ## /jobs
 
 @socketio.on('connect', namespace='/jobs')
-def on_connect():
+def on_connect_jobs():
     """
     Somebody connected to a jobs page
     """
+    pass
 
 @socketio.on('disconnect', namespace='/jobs')
-def on_disconnect():
+def on_disconnect_jobs():
     """
     Somebody disconnected from a jobs page
     """
     pass
 
 @socketio.on('join', namespace='/jobs')
-def on_join(data):
+def on_join_jobs(data):
     """
     Somebody joined a room
     """
@@ -281,7 +363,7 @@ def on_join(data):
     flask.session['room'] = room
 
 @socketio.on('leave', namespace='/jobs')
-def on_leave():
+def on_leave_jobs():
     """
     Somebody left a room
     """

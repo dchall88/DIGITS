@@ -7,6 +7,7 @@ import cStringIO
 import PIL.Image
 import numpy as np
 import scipy.misc
+import math
 
 from . import is_url, HTTP_TIMEOUT, errors
 
@@ -80,6 +81,26 @@ def load_image(path):
         return new
     else:
         raise errors.LoadImageError, 'Image mode "%s" not supported' % image.mode
+
+def upscale(image, ratio):
+    """
+    return upscaled image array
+
+    Arguments:
+    image -- a (H,W,C) numpy.ndarray
+    ratio -- scaling factor (>1)
+    """
+    if not isinstance(image, np.ndarray):
+        raise ValueError('Expected ndarray')
+    if ratio<1:
+        raise ValueError('Ratio must be greater than 1 (ratio=%f)' % ratio)
+    width = int(math.floor(image.shape[1] * ratio))
+    height = int(math.floor(image.shape[0] * ratio))
+    channels = image.shape[2]
+    out = np.ndarray((height, width, channels),dtype=np.uint8)
+    for x, y in np.ndindex((width,height)):
+        out[y,x] = image[math.floor(y/ratio), math.floor(x/ratio)]
+    return out
 
 def resize_image(image, height, width,
         channels=None,
@@ -249,10 +270,101 @@ def embed_image_html(image):
     else:
         raise ValueError('image must be a PIL.Image or a np.ndarray')
 
+    # Read format from the image
+    fmt = image.format
+    if not fmt:
+        # default to JPEG
+        fmt = 'jpeg'
+    else:
+        fmt = fmt.lower()
+
     string_buf = cStringIO.StringIO()
-    image.save(string_buf, format='png')
+    image.save(string_buf, format=fmt)
     data = string_buf.getvalue().encode('base64').replace('\n', '')
-    return 'data:image/png;base64,' + data
+    return 'data:image/%s;base64,%s' % (fmt, data)
+
+def get_layer_vis_square(data,
+        allow_heatmap = True,
+        normalize = True,
+        min_img_dim = 100,
+        max_width = 1200,
+        ):
+    """
+    Returns a vis_square for the given layer data
+
+    Arguments:
+    data -- a np.ndarray
+
+    Keyword arguments:
+    allow_heatmap -- if True, convert single channel images to heatmaps
+    normalize -- whether to normalize the data when visualizing
+    max_width -- maximum width for the vis_square
+    """
+    if data.ndim == 1:
+        # interpret as 1x1 grayscale images
+        # (N, 1, 1)
+        data = data[:, np.newaxis, np.newaxis]
+    elif data.ndim == 2:
+        # interpret as 1x1 grayscale images
+        # (N, 1, 1)
+        data = data.reshape((data.shape[0]*data.shape[1], 1, 1))
+    elif data.ndim == 3:
+        if data.shape[0] == 3:
+            # interpret as a color image
+            # (1, H, W,3)
+            data = data[[2,1,0],...] # BGR to RGB (see issue #59)
+            data = data.transpose(1,2,0)
+            data = data[np.newaxis,...]
+        else:
+            # interpret as grayscale images
+            # (N, H, W)
+            pass
+    elif data.ndim == 4:
+        if data.shape[0] == 3:
+            # interpret as HxW color images
+            # (N, H, W, 3)
+            data = data.transpose(1,2,3,0)
+            data = data[:,:,:,[2,1,0]] # BGR to RGB (see issue #59)
+        elif data.shape[1] == 3:
+            # interpret as HxW color images
+            # (N, H, W, 3)
+            data = data.transpose(0,2,3,1)
+            data = data[:,:,:,[2,1,0]] # BGR to RGB (see issue #59)
+        else:
+            # interpret as HxW grayscale images
+            # (N, H, W)
+            data = data.reshape((data.shape[0]*data.shape[1], data.shape[2], data.shape[3]))
+    else:
+        raise RuntimeError('unrecognized data shape: %s' % (data.shape,))
+
+    # chop off data so that it will fit within max_width
+    padsize = 0
+    width = data.shape[2]
+    if width > max_width:
+        data = data[:1,:max_width,:max_width]
+    else:
+        if width > 1:
+            padsize = 1
+            width += 1
+        n = max(max_width/width,1)
+        n *= n
+        data = data[:n]
+
+    if not allow_heatmap and data.ndim == 3:
+        data = data[...,np.newaxis]
+
+    vis = vis_square(data,
+            padsize     = padsize,
+            normalize   = normalize,
+            )
+
+    # find minimum dimension and upscale if necessary
+    _min = sorted(vis.shape[:2])[0]
+    if _min < min_img_dim:
+        # upscale image
+        ratio = min_img_dim/float(_min)
+        vis = upscale(vis, ratio)
+    return vis
 
 def vis_square(images,
         padsize=1,
@@ -314,6 +426,10 @@ def vis_square(images,
     tiles = padded.reshape( (ny, nx) + padded.shape[1:]).transpose( (0,2,1,3) + tuple(range(4, padded.ndim + 1)))
     tiles = tiles.reshape((ny * tiles.shape[1], nx * tiles.shape[3]) + tiles.shape[4:])
 
+    if tiles.shape[-1] == 1:
+        # grayscale to color
+        tiles = np.dstack([tiles.squeeze()] * 3)
+
     return tiles
 
 def get_color_map(name):
@@ -353,3 +469,4 @@ def get_color_map(name):
         greenmap    = [0,0,0.5,1,1,1,0.5,0,0]
         bluemap     = [0.5,1,1,1,0.5,0,0,0,0]
     return 255.0 * np.array(redmap), 255.0 * np.array(greenmap), 255.0 * np.array(bluemap)
+

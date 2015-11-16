@@ -20,6 +20,9 @@ install:
     - pushd .
     - ./scripts/travis/install-caffe.sh $(pwd)/deps/caffe
 
+    # Torch
+    - travis_wait ./scripts/travis/install-torch-wrapper.sh $(pwd)/deps/torch $(pwd)/torch-install-log.txt
+
     # DIGITS
     - sudo apt-get install graphviz
     # conda (fast)
@@ -29,6 +32,9 @@ install:
     - pip install -r requirements_test.txt
 before_script:
     - export CAFFE_HOME=$(pwd)/deps/caffe
+    - source $(pwd)/deps/torch/install/bin/torch-activate
+    # Disable OpenMP multi-threading
+    - export OMP_NUM_THREADS=1
 script:
     ./digits-test -v --with-coverage --cover-package=digits,tools,scripts
 after_success:

@@ -4,12 +4,12 @@ To use Caffe in DIGITS, you must use [NVIDIA's fork](https://github.com/NVIDIA/c
 
 To enable multi-GPU training, install version [`0.12`](https://github.com/NVIDIA/caffe/tree/caffe-0.12).
 
-To take advantage of the performance gains in cuDNN v3, install version [`0.13`](https://github.com/NVIDIA/caffe/tree/caffe-0.13).
+For cuDNN v3, install version [`0.13`](https://github.com/NVIDIA/caffe/tree/caffe-0.12).
 
 ## Grab the source
 
     % cd $HOME
-    % git clone --branch caffe-0.13 https://github.com/NVIDIA/caffe.git
+    % git clone --branch caffe-0.12 https://github.com/NVIDIA/caffe.git
 
 Set an environment variable so DIGITS knows where Caffe is installed (optional):
 
@@ -20,9 +20,14 @@ Set an environment variable so DIGITS knows where Caffe is installed (optional):
 If you are not on Ubuntu 14.04, you can try [Caffe's installation instructions](http://caffe.berkeleyvision.org/installation.html).
 If you are, simply install these aptitude packages:
 
-    % sudo apt-get install libprotobuf-dev libleveldb-dev libsnappy-dev libopencv-dev libhdf5-serial-dev libgflags-dev libgoogle-glog-dev liblmdb-dev protobuf-compiler libatlas-base-dev
+    % sudo apt-get install \
+        libgflags-dev libgoogle-glog-dev \
+        libopencv-dev \
+        libleveldb-dev libsnappy-dev liblmdb-dev libhdf5-serial-dev \
+        libprotobuf-dev protobuf-compiler \
+        libatlas-base-dev \
+        python-dev python-pip python-numpy gfortran
     % sudo apt-get install --no-install-recommends libboost-all-dev
-    % sudo apt-get install python-dev python-pip gfortran
 
 ### Python dependencies
 
@@ -41,6 +46,31 @@ If you want to install these packages *without* using a virtual environment, rep
 
 ## Build Caffe
 
+#### Using CMake
+
+You can use [CMake](http://www.cmake.org/) to configure your build for you.
+It will try to find the correct paths to every library needed to build Caffe.
+
+    % cd $CAFFE_HOME
+    % mkdir build
+    % cd build
+    % cmake ..
+    % make --jobs=4
+
+If you are using [cuDNN](https://developer.nvidia.com/cudnn) (for faster performance) and [CNMeM](https://github.com/NVIDIA/cnmem) (better GPU memory utilization for faster performance and fewer out-of-memory-errors), then you may want to configure CMake like this:
+
+    % export CUDNN_HOME=/path/to/cudnn
+    % export CNMEM_HOME=/path/to/cnmem
+    % cmake \
+      -DUSE_CNMEM=ON \
+      -DCUDNN_INCLUDE=${CUDNN_HOME}/include -DCUDNN_LIBRARY=${CUDNN_HOME}/lib64/libcudnn.so \
+      -DCNMEM_INCLUDE=${CNMEM_HOME}/include -DCNMEM_LIBRARY=${CNMEM_HOME}/build/libcnmem.so \
+      ..
+
+#### Using Make
+
+You can also use Make directly.
+
     % cd $CAFFE_HOME
     % cp Makefile.config.example Makefile.config
     % make all --jobs=4
@@ -48,4 +78,3 @@ If you want to install these packages *without* using a virtual environment, rep
 
 NOTE: You may need to make some changes to `Makefile.config` to get Caffe to compile if you haven't installed CUDA or cuDNN.
 
-(CMake instructions coming soon)

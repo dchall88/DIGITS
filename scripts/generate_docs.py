@@ -4,18 +4,14 @@
 import sys
 import os.path
 import time
-from pprint import pprint
 from collections import defaultdict
 
 # requires a custom version of Flask-Autodoc:
 #   pip install git+https://github.com/lukeyeager/flask-autodoc.git
 from flask.ext.autodoc import Autodoc
 
-try:
-    import digits
-except ImportError:
-    # Add path for DIGITS package
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add path for DIGITS package
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import digits.config; digits.config.load_config()
 from digits.webapp import app, _doc as doc
 
@@ -149,7 +145,7 @@ class DocGenerator(object):
                     args[-1] = '%s (`%s`)' % (args[-1], route['defaults'][arg])
             self.w('Arguments: ' + ', '.join(args))
             self.w()
-        if 'location' in route:
+        if 'location' in route and route['location']:
             # get location relative to digits root
             digits_root = os.path.dirname(
                     os.path.dirname(
@@ -158,10 +154,10 @@ class DocGenerator(object):
                     )
             filename = os.path.normpath(route['location']['filename'])
             if filename.startswith(digits_root):
-                filename = os.path.relpath(filename, digits_root)
-                self.w('Location: [`%s@%s`](%s#L%s)' % (
-                    filename, route['location']['line'],
-                    os.path.join('..', filename), route['location']['line'],
+                filename = os.path.relpath(filename, digits_root).replace("\\","/")
+                self.w('Location: [`%s`](%s)' % (
+                    filename,
+                    os.path.join('..', filename).replace("\\","/"),
                     ))
                 self.w()
 

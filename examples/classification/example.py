@@ -51,7 +51,10 @@ def get_transformer(deploy_file, mean_file=None):
     with open(deploy_file) as infile:
         text_format.Merge(infile.read(), network)
 
-    dims = network.input_dim
+    if network.input_shape:
+        dims = network.input_shape[0].dim
+    else:
+        dims = network.input_dim[:4]
 
     t = caffe.io.Transformer(
             inputs = {'data': dims}
@@ -65,7 +68,7 @@ def get_transformer(deploy_file, mean_file=None):
 
     if mean_file:
         # set mean pixel
-        with open(mean_file) as infile:
+        with open(mean_file,'rb') as infile:
             blob = caffe_pb2.BlobProto()
             blob.MergeFromString(infile.read())
             if blob.HasField('shape'):
@@ -137,7 +140,7 @@ def forward_pass(images, net, transformer, batch_size=1):
             net.blobs['data'].data[index] = image_data
         output = net.forward()[net.outputs[-1]]
         if scores is None:
-            scores = output
+            scores = np.copy(output)
         else:
             scores = np.vstack((scores, output))
         print 'Processed %s/%s images ...' % (len(scores), len(caffe_images))

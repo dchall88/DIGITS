@@ -38,7 +38,7 @@ class TrainTask(Task):
         val_interval -- how many epochs between validating the model with an epoch of validation data
         pretrained_model -- filename for a model to use for fine-tuning
         crop_size -- crop each image down to a square of this size
-        use_mean -- subtract the dataset's mean file
+        use_mean -- subtract the dataset's mean file or mean pixel
         random_seed -- optional random seed
         """
         self.gpu_count = kwargs.pop('gpu_count', None)
@@ -50,6 +50,9 @@ class TrainTask(Task):
         self.use_mean = kwargs.pop('use_mean', None)
         self.random_seed = kwargs.pop('random_seed', None)
         self.solver_type = kwargs.pop('solver_type', None)
+        self.shuffle = kwargs.pop('shuffle', None)
+        self.network = kwargs.pop('network', None)
+        self.framework_id = kwargs.pop('framework_id', None)
 
         super(TrainTask, self).__init__(**kwargs)
         self.pickver_task_train = PICKLE_VERSION
@@ -204,17 +207,7 @@ class TrainTask(Task):
 
         self.current_epoch = epoch
         self.progress = epoch/self.train_epochs
-
-        socketio.emit('task update',
-                {
-                    'task': self.html_id(),
-                    'update': 'progress',
-                    'percentage': int(round(100*self.progress)),
-                    'eta': utils.time_filters.print_time_diff(self.est_done()),
-                    },
-                namespace='/jobs',
-                room=self.job_id,
-                )
+        self.emit_progress_update()
 
     def save_train_output(self, *args):
         """
@@ -243,6 +236,20 @@ class TrainTask(Task):
                     namespace='/jobs',
                     room=self.job_id,
                     )
+
+            if data['columns']:
+                # isolate the Loss column data for the sparkline
+                graph_data = data['columns'][0][1:]
+                socketio.emit('task update',
+                              {
+                                  'task': self.html_id(),
+                                  'job_id': self.job_id,
+                                  'update': 'combined_graph',
+                                  'data': graph_data,
+                              },
+                              namespace='/jobs',
+                              room='job_management',
+                          )
 
         # lr graph data
         data = self.lr_graph_data()
@@ -319,7 +326,9 @@ class TrainTask(Task):
             d[name].data.append(value)
         else:
             # we might have missed one
-            d[name].data += [None] * (epoch_len - name_len - 1) + [value]
+            for _ in xrange(epoch_len - name_len - 1):
+                d[name].data.append(None)
+            d[name].data.append(value)
 
         for key in d:
             if key not in ['epoch', 'learning_rate']:
@@ -442,92 +451,6 @@ class TrainTask(Task):
                     },
                 }
 
-    def loss_graph_data(self):
-        """
-        Returns loss data formatted for a C3.js graph
-        """
-        data = {
-                'columns': [],
-                'xs': {},
-                'names': {},
-                }
-
-        if self.train_outputs and 'epoch' in self.train_outputs:
-            added_column = False
-            stride = max(len(self.train_outputs['epoch'].data)/100,1)
-            for name, output in self.train_outputs.iteritems():
-                if name not in ['epoch', 'learning_rate']:
-                    if 'loss' in output.kind.lower():
-                        col_id = '%s-train' % name
-                        data['columns'].append([col_id] + output.data[::stride])
-                        data['xs'][col_id] = 'train_epochs'
-                        data['names'][col_id] = '%s (train)' % name
-                        added_column = True
-            if added_column:
-                data['columns'].append(['train_epochs'] + self.train_outputs['epoch'].data[::stride])
-
-        if self.val_outputs and 'epoch' in self.val_outputs:
-            added_column = False
-            stride = max(len(self.val_outputs['epoch'].data)/100,1)
-            for name, output in self.val_outputs.iteritems():
-                if name not in ['epoch']:
-                    if 'loss' in output.kind.lower():
-                        col_id = '%s-val' % name
-                        data['columns'].append([col_id] + output.data[::stride])
-                        data['xs'][col_id] = 'val_epochs'
-                        data['names'][col_id] = '%s (val)' % name
-                        added_column = True
-            if added_column:
-                data['columns'].append(['val_epochs'] + self.val_outputs['epoch'].data[::stride])
-
-        if not len(data['columns']):
-            return None
-        else:
-            return data
-
-    def accuracy_graph_data(self):
-        """
-        Returns accuracy data formatted for a C3.js graph
-        """
-        data = {
-                'columns': [],
-                'xs': {},
-                'names': {},
-                }
-
-        if self.train_outputs and 'epoch' in self.train_outputs:
-            added_column = False
-            stride = max(len(self.train_outputs['epoch'].data)/100,1)
-            for name, output in self.train_outputs.iteritems():
-                if name not in ['epoch', 'learning_rate']:
-                    if output.kind == 'Accuracy':
-                        col_id = '%s-train' % name
-                        data['columns'].append([col_id] + [100*x for x in output.data[::stride]])
-                        data['xs'][col_id] = 'train_epochs'
-                        data['names'][col_id] = '%s (train)' % name
-                        added_column = True
-            if added_column:
-                data['columns'].append(['train_epochs'] + self.train_outputs['epoch'].data[::stride])
-
-        if self.val_outputs and 'epoch' in self.val_outputs:
-            added_column = False
-            stride = max(len(self.val_outputs['epoch'].data)/100,1)
-            for name, output in self.val_outputs.iteritems():
-                if name not in ['epoch']:
-                    if output.kind == 'Accuracy':
-                        col_id = '%s-val' % name
-                        data['columns'].append([col_id] + [100*x for x in output.data[::stride]])
-                        data['xs'][col_id] = 'val_epochs'
-                        data['names'][col_id] = '%s (val)' % name
-                        added_column = True
-            if added_column:
-                data['columns'].append(['val_epochs'] + self.val_outputs['epoch'].data[::stride])
-
-        if not len(data['columns']):
-            return None
-        else:
-            return data
-
     def combined_graph_data(self, cull=True):
         """
         Returns all train/val outputs in data for one C3.js graph
@@ -542,11 +465,15 @@ class TrainTask(Task):
                 'names': {},
                 }
 
+        added_train_data = False
+        added_val_data = False
+
         if self.train_outputs and 'epoch' in self.train_outputs:
-            added_column = False
             if cull:
+                # max 200 data points
                 stride = max(len(self.train_outputs['epoch'].data)/100,1)
             else:
+                # return all data
                 stride = 1
             for name, output in self.train_outputs.iteritems():
                 if name not in ['epoch', 'learning_rate']:
@@ -558,20 +485,20 @@ class TrainTask(Task):
                         data['axes'][col_id] = 'y2'
                     else:
                         data['columns'].append([col_id] + output.data[::stride])
-                    added_column = True
-            if added_column:
-                data['columns'].append(['train_epochs'] + self.train_outputs['epoch'].data[::stride])
+                    added_train_data = True
+        if added_train_data:
+            data['columns'].append(['train_epochs'] + self.train_outputs['epoch'].data[::stride])
 
         if self.val_outputs and 'epoch' in self.val_outputs:
-            added_column = False
             if cull:
+                # max 200 data points
                 stride = max(len(self.val_outputs['epoch'].data)/100,1)
             else:
+                # return all data
                 stride = 1
             for name, output in self.val_outputs.iteritems():
                 if name not in ['epoch']:
                     col_id = '%s-val' % name
-                    data['columns'].append([col_id] + output.data[::stride])
                     data['xs'][col_id] = 'val_epochs'
                     data['names'][col_id] = '%s (val)' % name
                     if 'accuracy' in output.kind.lower():
@@ -579,12 +506,31 @@ class TrainTask(Task):
                         data['axes'][col_id] = 'y2'
                     else:
                         data['columns'].append([col_id] + output.data[::stride])
-                    added_column = True
-            if added_column:
-                data['columns'].append(['val_epochs'] + self.val_outputs['epoch'].data[::stride])
+                    added_val_data = True
+        if added_val_data:
+            data['columns'].append(['val_epochs'] + self.val_outputs['epoch'].data[::stride])
 
-        if not len(data['columns']):
-            return None
-        else:
+        if added_train_data:
             return data
+        else:
+            # return None if only validation data exists
+            # helps with ordering of columns in graph
+            return None
+
+    # return id of framework used for training
+    @override
+    def get_framework_id(self):
+        return self.framework_id
+
+    def get_model_files(self):
+        """
+        return path to model file
+        """
+        raise NotImplementedError()
+
+    def get_network_desc(self):
+        """
+        return text description of model
+        """
+        raise NotImplementedError()
 

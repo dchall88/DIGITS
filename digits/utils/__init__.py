@@ -2,17 +2,24 @@
 
 import os
 import math
-import fcntl
 import locale
 from random import uniform
 from urlparse import urlparse
 from io import BlockingIOError
 import inspect
+import pkg_resources
+import platform
+
+
+if not platform.system() == 'Windows':
+    import fcntl
+else:
+    import gevent.os
 
 HTTP_TIMEOUT = 6.05
 
 def is_url(url):
-    return url is not None and urlparse(url).scheme != ""
+    return url is not None and urlparse(url).scheme != "" and not os.path.exists(url)
 
 def wait_time():
     """Wait a random number of seconds"""
@@ -27,14 +34,18 @@ def nonblocking_readlines(f):
        Newlines are normalized to the Unix standard.
     """
     fd = f.fileno()
-    fl = fcntl.fcntl(fd, fcntl.F_GETFL)
-    fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+    if not platform.system() == 'Windows':
+        fl = fcntl.fcntl(fd, fcntl.F_GETFL)
+        fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
     enc = locale.getpreferredencoding(False)
 
     buf = bytearray()
     while True:
         try:
-            block = os.read(fd, 8192)
+            if not platform.system() == 'Windows':
+                block = os.read(fd, 8192)
+            else:
+                block = gevent.os.tp_read(fd, 8192)
         except (BlockingIOError, OSError):
             yield ""
             continue
@@ -42,7 +53,6 @@ def nonblocking_readlines(f):
         if not block:
             if buf:
                 yield buf.decode(enc)
-                buf.clear()
             break
 
         buf.extend(block)
@@ -117,7 +127,32 @@ def sizeof_fmt(size, suffix='B'):
     else:
         return '0 %s' % suffix
 
+def parse_version(*args):
+    """
+    Returns a sortable version
+
+    Arguments:
+    args -- a string, tuple, or list of arguments to be joined with "."'s
+    """
+    v = None
+    if len(args) == 1:
+        a = args[0]
+        if isinstance(a, tuple):
+            v = '.'.join(str(x) for x in a)
+        else:
+            v = str(a)
+    else:
+        v = '.'.join(str(a) for a in args)
+
+    if v.startswith('v'):
+        v = v[1:]
+
+    try:
+        return pkg_resources.SetuptoolsVersion(v)
+    except AttributeError:
+        return pkg_resources.parse_version(v)
+
 ### Import the other utility functions
 
-from . import constants, image, time_filters, errors
+from . import constants, image, time_filters, errors, forms
 

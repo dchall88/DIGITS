@@ -10,7 +10,7 @@ import digits.scheduler
 ### Create Flask, Scheduler and SocketIO objects
 
 app = flask.Flask(__name__)
-app.config['DEBUG'] = False
+app.config['DEBUG'] = True
 # Disable CSRF checking in WTForms
 app.config['WTF_CSRF_ENABLED'] = False
 # This is still necessary for SocketIO
@@ -34,6 +34,7 @@ except ImportError:
 ### Register filters and views
 
 app.jinja_env.globals['server_name'] = config_value('server_name')
+app.jinja_env.globals['server_version'] = digits.__version__
 app.jinja_env.filters['print_time'] = utils.time_filters.print_time
 app.jinja_env.filters['print_time_diff'] = utils.time_filters.print_time_diff
 app.jinja_env.filters['print_time_since'] = utils.time_filters.print_time_since
@@ -46,4 +47,3 @@ import digits.views
 ### Setup the environment
 
 scheduler.load_past_jobs()
-

@@ -96,6 +96,7 @@ class Scheduler:
                 # TODO: break this into CPU cores, memory usage, IO usage, etc.
                 'parse_folder_task_pool': [Resource()],
                 'create_db_task_pool': [Resource(max_value=2)],
+                'analyze_db_task_pool': [Resource(max_value=4)],
                 'gpus': [Resource(identifier=index)
                     for index in gpu_list.split(',')] if gpu_list else [],
                 }
@@ -174,6 +175,35 @@ class Scheduler:
             return False
         else:
             self.jobs.append(job)
+
+            # Need to fix this properly
+            # if True or flask._app_ctx_stack.top is not None:
+            from digits.webapp import app
+            with app.app_context():
+                # send message to job_management room that the job is added
+                import flask
+                html = flask.render_template('job_row.html', job = job)
+
+                # Convert the html into a list for the jQuery
+                # DataTable.row.add() method.  This regex removes the <tr>
+                # and <td> tags, and splits the string into one element
+                # for each cell.
+                import re
+                html = re.sub('<tr[^<]*>[\s\n\r]*<td[^<]*>[\s\n\r]*', '', html)
+                html = re.sub('[\s\n\r]*</td>[\s\n\r]*</tr>', '', html)
+                html = re.split('</td>[\s\n\r]*<td[^<]*>', html)
+
+                from digits.webapp import socketio
+                socketio.emit('job update',
+                              {
+                                  'update': 'added',
+                                  'job_id': job.id(),
+                                  'html': html
+                              },
+                              namespace='/jobs',
+                              room='job_management',
+                          )
+
             if 'DIGITS_MODE_TEST' not in os.environ:
                 # Let the scheduler do a little work before returning
                 time.sleep(utils.wait_time())
@@ -237,6 +267,15 @@ class Scheduler:
                 if os.path.exists(job.dir()):
                     shutil.rmtree(job.dir())
                 logger.info('Job deleted.', job_id=job_id)
+                from digits.webapp import socketio
+                socketio.emit('job update',
+                              {
+                                  'update': 'deleted',
+                                  'job_id': job.id()
+                              },
+                              namespace='/jobs',
+                              room='job_management',
+                )
                 return True
 
         # see if the folder exists on disk
@@ -269,7 +308,7 @@ class Scheduler:
                 cmp=lambda x,y: cmp(y.id(), x.id())
                 )
 
-    def running_model_jobs(self):
+    def completed_model_jobs(self):
         """a query utility"""
         return sorted(
                 [j for j in self.jobs if isinstance(j, ModelJob) and not j.status.is_running()],
@@ -352,8 +391,6 @@ class Scheduler:
                                         task.status = Status.WAIT
                                     else:
                                         if self.reserve_resources(task, requested_resources):
-                                            logger.debug('%s task started.' % task.name(),
-                                                    job_id=job.id())
                                             gevent.spawn(self.run_task,
                                                     task, requested_resources)
                             elif task.status == Status.RUN:
@@ -418,6 +455,7 @@ class Scheduler:
                     for resource in self.resources[resource_type]:
                         if resource.identifier == identifier:
                             resource.allocate(task, value)
+                            self.emit_gpus_available()
                             found = True
                             break
                     if not found:
@@ -440,6 +478,7 @@ class Scheduler:
                 for resource in self.resources[resource_type]:
                     if resource.identifier == identifier:
                         resource.deallocate(task)
+                        self.emit_gpus_available()
         task.current_resources = None
 
     def run_task(self, task, resources):
@@ -458,3 +497,17 @@ class Scheduler:
         finally:
             self.release_resources(task, resources)
 
+    def emit_gpus_available(self):
+        """
+        Call socketio.emit gpu availablity
+        """
+        from digits.webapp import scheduler, socketio
+        socketio.emit('server update',
+                      {
+                          'update': 'gpus_available',
+                          'total_gpu_count': len(self.resources['gpus']),
+                          'remaining_gpu_count': sum(r.remaining() for r in scheduler.resources['gpus']),
+                      },
+                      namespace='/jobs',
+                      room='job_management'
+                  )

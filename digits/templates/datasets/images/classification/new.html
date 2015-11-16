@@ -1,6 +1,8 @@
 {# Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved. #}
 
 {% from "helper.html" import print_flashes %}
+{% from "helper.html" import print_errors %}
+{% from "helper.html" import mark_errors %}
 
 {% extends "layout.html" %}
 
@@ -13,6 +15,7 @@ New Image Classification Dataset
 {% endblock %}
 
 {% block content %}
+
 <div class="page-header">
     <h1>New Image Classification Dataset</h1>
 </div>
@@ -20,76 +23,37 @@ New Image Classification Dataset
 <form action="{{url_for('image_classification_dataset_create')}}" enctype="multipart/form-data" method="post">
     {{ form.hidden_tag() }}
 
-    {% if form.errors %}
-        <div class="alert alert-danger">
-            {% for field, errors in form.errors.items() %}
-                <li>{{ field }}
-                    <ul>
-                        {% for e in errors %}
-                            <li>{{ e }}</li>
-                        {% endfor %}
-                    </ul>
-                </li>
-            {% endfor %}
-        </div>
-    {% endif %}
+    {{ print_errors(form) }}
 
     <div class="row">
         <div class="col-sm-4 well">
             <div class="row">
-                <div class="form-group{{ ' has-error' if form.resize_channels.errors else '' }}">
+                <div class="form-group{{mark_errors([form.resize_channels])}}">
                     {{ form.resize_channels.label }}
-                    <div class="input-group">
-                        {{ form.resize_channels(class='form-control') }}
-                        <span name="resize_channels_explanation"
-                            class="input-group-addon explanation-tooltip glyphicon glyphicon-question-sign"
-                            data-container="body"
-                            title="Color is 3-channel RGB. Grayscale is single channel monochrome."
-                            ></span>
-                    </div>
+                    {{ form.resize_channels.tooltip }}
+                    {{ form.resize_channels(class='form-control') }}
                 </div>
             </div>
             <div class="row">
-                <div class="form-group{{ ' has-error' if form.encoding.errors else '' }}">
-                    <div class="form-group{{' has-error' if form.encoding.errors}}">
-                        {{form.encoding.label}}
-                        <div class="input-group">
-                            {{form.encoding(class='form-control')}}
-                            <span name="encoding_explanation"
-                                class="input-group-addon explanation-tooltip glyphicon glyphicon-question-sign"
-                                data-container="body"
-                                title="Using either of these compression formats can save disk space, but can also require marginally more time for training."
-                                ></span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="row">
-                <div class="form-group{{ ' has-error' if form.resize_width.errors or form.resize_height.errors else '' }}">
+                <div class="form-group{{mark_errors([form.resize_width, form.resize_height])}}">
                     <label>Image size</label>
+                    <span name="resize_dims_explanation"
+                          class="explanation-tooltip glyphicon glyphicon-question-sign"
+                          data-container="body"
+                          title="Input images will be resized to fit."
+                          ></span>
                     <div class="input-group">
                         {{ form.resize_width(size=4, placeholder='width', class='form-control') }}
                         <span class="input-group-addon">x</span>
                         {{ form.resize_height(size=4, placeholder='height', class='form-control') }}
-                        <span name="resize_dims_explanation"
-                            class="input-group-addon explanation-tooltip glyphicon glyphicon-question-sign"
-                            data-container="body"
-                            title="Input images will be resized to fit."
-                            ></span>
                     </div>
                 </div>
             </div>
             <div class="row">
-                <div class="form-group{{ ' has-error' if form.resize_mode.errors else '' }}">
+                <div class="form-group{{mark_errors([form.resize_mode])}}">
                     {{ form.resize_mode.label }}
-                    <div class="input-group">
-                        {{ form.resize_mode(class='form-control') }}
-                        <span name="resize_mode_explanation"
-                            class="input-group-addon explanation-tooltip glyphicon glyphicon-question-sign"
-                            data-container="body"
-                            title="Options for dealing with aspect ratio changes during resize. See examples below."
-                            ></span>
-                    </div>
+                    {{ form.resize_mode.tooltip }}
+                    {{ form.resize_mode(class='form-control') }}
                 </div>
             </div>
             <div class="row">
@@ -110,6 +74,7 @@ function showResizeExample()
                 "width":    $("#resize_width").val(),
                 "height":   $("#resize_height").val(),
                 "resize_mode":   $("#resize_mode").val(),
+                "backend": $("#backend").val(),
                 "encoding": $("#encoding").val(),
             },
             function(response) {
@@ -127,23 +92,17 @@ function showResizeExample()
             <!-- Nav tabs -->
             <ul class="nav nav-tabs" id="db-tabs" role="tablist">
                 <li><a href="#db-folder" role="tab" data-toggle="tab">Use Image Folder</a></li>
-                <li><a href="#db-textfile" role="tab" data-toggle="tab">Upload Text Files</a></li>
+                <li><a href="#db-textfile" role="tab" data-toggle="tab">Use Text Files</a></li>
             </ul>
 
             <!-- Tab panes -->
             <div class="tab-content well">
                 <!-- Folder -->
                 <div class="tab-pane" id="db-folder">
-                    <div class="form-group{{ ' has-error' if form.folder_train.errors else '' }}">
+                    <div class="form-group{{mark_errors([form.folder_train])}}">
                         {{ form.folder_train.label }}
-                        <div class="input-group">
-                            {{ form.folder_train(class='form-control', placeholder='folder or URL')}}
-                            <span name="folder_train_explanation"
-                                class="input-group-addon explanation-tooltip glyphicon glyphicon-question-sign"
-                                data-container="body"
-                                title="Indicate a folder which holds subfolders full of images. Each subfolder should be named according to the desired label for the images that it holds. Can also be a URL for an apache/nginx auto-indexed folder."
-                                ></span>
-                        </div>
+                        {{ form.folder_train.tooltip }}
+                        {{ form.folder_train(class='form-control autocomplete_path', placeholder='folder or URL')}}
                     </div>
                     <div class="row">
                         <div class="col-sm-10 col-sm-offset-1">
@@ -152,47 +111,59 @@ function showResizeExample()
                         </div>
                     </div>
                     <div class="row">
-                        <div class="form-group col-sm-6{{ ' has-error' if form.folder_pct_val.errors else '' }}">
-                            {{ form.folder_pct_val.label }}
-                            <div class="input-group">
-                                {{ form.folder_pct_val(class='form-control') }}
-                                <span name="folder_pct_val_explanation"
-                                    class="input-group-addon explanation-tooltip glyphicon glyphicon-question-sign"
-                                    data-container="body"
-                                    title="You can choose to set apart a certain percentage of images from the training images for the validation set."
-                                    ></span>
-                            </div>
+                        <div class="form-group col-sm-6{{mark_errors([form.folder_train_min_per_class])}}">
+                            {{ form.folder_train_min_per_class.label }}
+                            {{ form.folder_train_min_per_class.tooltip }}
+                            {{ form.folder_train_min_per_class(class='form-control') }}
                         </div>
-                        <div class="form-group col-sm-6{{ ' has-error' if form.folder_pct_test.errors else '' }}">
+                        <div class="form-group col-sm-6{{mark_errors([form.folder_train_max_per_class])}}">
+                            {{ form.folder_train_max_per_class.label }}
+                            {{ form.folder_train_max_per_class.tooltip }}
+                            {{ form.folder_train_max_per_class(class='form-control') }}
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="form-group col-sm-6{{mark_errors([form.folder_pct_val])}}">
+                            {{ form.folder_pct_val.label }}
+                            {{ form.folder_pct_val.tooltip }}
+                            {{ form.folder_pct_val(class='form-control') }}
+                        </div>
+                        <div class="form-group col-sm-6{{mark_errors([form.folder_pct_test])}}">
                             {{ form.folder_pct_test.label }}
-                            <div class="input-group">
-                                {{ form.folder_pct_test(class='form-control') }}
-                                <span name="folder_pct_test_explanation"
-                                    class="input-group-addon explanation-tooltip glyphicon glyphicon-question-sign"
-                                    data-container="body"
-                                    title="You can choose to set apart a certain percentage of images from the training images for the test set."
-                                    ></span>
-                            </div>
+                            {{ form.folder_pct_test.tooltip }}
+                            {{ form.folder_pct_test(class='form-control') }}
                         </div>
                     </div>
                     <br>
                     {{form.has_val_folder}}
                     {{form.has_val_folder.label}}
-                    <div id="separate-val-folder" style="display:none;" class="form-group{{ ' has-error' if form.folder_val.errors else '' }}">
+                    <div style="display:none;" class="form-group{{mark_errors([form.folder_val])}} cl-separate-val-folder">
                         {{ form.folder_val.label }}
-                        {{ form.folder_val(class='form-control') }}
+                        {{ form.folder_val(class='form-control autocomplete_path') }}
+                    </div>
+                    <div class="row cl-separate-val-folder">
+                        <div class="form-group col-sm-6{{mark_errors([form.folder_val_min_per_class])}}">
+                            {{ form.folder_val_min_per_class.label }}
+                            {{ form.folder_val_min_per_class.tooltip }}
+                            {{ form.folder_val_min_per_class(class='form-control') }}
+                        </div>
+                        <div class="form-group col-sm-6{{mark_errors([form.folder_val_max_per_class])}}">
+                            {{ form.folder_val_max_per_class.label }}
+                            {{ form.folder_val_max_per_class.tooltip }}
+                            {{ form.folder_val_max_per_class(class='form-control') }}
+                        </div>
                     </div>
                     <script>
 function hasValFolderChanged() {
     if ($("#has_val_folder").prop("checked"))
     {
         $("#folder_val").prop("disabled", false);
-        $("#separate-val-folder").show();
+        $(".cl-separate-val-folder").show();
         $("#folder_pct_val").prop("disabled", true);
     }
     else
     {
-        $("#separate-val-folder").hide();
+        $(".cl-separate-val-folder").hide();
         $("#folder_val").prop("disabled", true);
         $("#folder_pct_val").prop("disabled", false);
     }
@@ -203,21 +174,33 @@ hasValFolderChanged();
                     <br>
                     {{form.has_test_folder}}
                     {{form.has_test_folder.label}}
-                    <div id="separate-test-folder" style="display:none;" class="form-group{{ ' has-error' if form.folder_test.errors else '' }}">
+                    <div style="display:none;" class="form-group{{mark_errors([form.folder_test])}} cl-separate-test-folder">
                         {{ form.folder_test.label }}
-                        {{ form.folder_test(class='form-control') }}
+                        {{ form.folder_test(class='form-control autocomplete_path') }}
+                    </div>
+                    <div style="display:none;" class="row cl-separate-test-folder">
+                        <div class="form-group col-sm-6{{mark_errors([form.folder_test_min_per_class])}}">
+                            {{ form.folder_test_min_per_class.label }}
+                            {{ form.folder_test_min_per_class.tooltip }}
+                            {{ form.folder_test_min_per_class(class='form-control') }}
+                        </div>
+                        <div class="form-group col-sm-6{{mark_errors([form.folder_test_max_per_class])}}">
+                            {{ form.folder_test_max_per_class.label }}
+                            {{ form.folder_test_max_per_class.tooltip }}
+                            {{ form.folder_test_max_per_class(class='form-control') }}
+                        </div>
                     </div>
                     <script>
 function hasTestFolderChanged() {
     if ($("#has_test_folder").prop("checked"))
     {
         $("#folder_test").prop("disabled", false);
-        $("#separate-test-folder").show();
+        $(".cl-separate-test-folder").show();
         $("#folder_pct_test").prop("disabled", true);
     }
     else
     {
-        $("#separate-test-folder").hide();
+        $(".cl-separate-test-folder").hide();
         $("#folder_test").prop("disabled", true);
         $("#folder_pct_test").prop("disabled", false);
     }
@@ -231,27 +214,45 @@ hasTestFolderChanged();
                     <div class="row">
                         <table class="table">
                             <tr>
-                                <th>Set</th>
+                                <th width="20%">Set</th>
 
-                                <th>Text file <span name="text_file_explanation"
-                                    class="explanation-tooltip glyphicon glyphicon-question-sign"
+                                <th width="40%">Text file <span name="text_file_explanation"
+                          class="explanation-tooltip glyphicon glyphicon-question-sign"
                                     data-container="body"
                                     title="Each line in the file should be formatted as '<PATH> <LABEL>' where <PATH> specifies image path either on the local filesystem or a URL, and the <LABEL> is a numeric label that matches the uploaded labels file"
                                 ></span></th>
 
-                                <th>Image folder <i>(optional)</i> <span name="image_folder_explanation"
+                                <th width="40%">Image folder <i>(optional)</i> <span name="image_folder_explanation"
                                     class="explanation-tooltip glyphicon glyphicon-question-sign"
                                     data-container="body"
                                     title="Paths in the text files will be appended with this value before reading"
                                 ></span></th>
                             </tr>
                             <tr>
+                                <td></td>
+                                <td>
+                                    <label for="{{form.textfile_use_local_files.name}}">
+                                        {{form.textfile_use_local_files}}
+                                        Use local paths on server
+                                    </label>
+                                    <span name="text_file_explanation"
+                                          class="explanation-tooltip glyphicon glyphicon-question-sign"
+                                          data-container="body"
+                                          title="Check to use local paths on server, uncheck to upload files from client machine"
+                                    ></span>
+                                </td>
+                                <td></td>
+                            </tr>
+                            <tr>
                                 <td><b>Training</b></td>
-                                <td class="form-group{{' has-error' if form.textfile_train_images.errors}}">
+                                <td class="form-group{{mark_errors([form.textfile_train_images])}} cl-upload-files">
                                     {{ form.textfile_train_images(class='form-control') }}
                                 </td>
-                                <td class="form-group{{' has-error' if form.textfile_train_folder.errors}}">
-                                    {{ form.textfile_train_folder(class='form-control') }}
+                                <td class="form-group{{mark_errors([form.textfile_local_train_images])}} cl-local-files">
+                                    {{ form.textfile_local_train_images(class='form-control autocomplete_path',placeholder='enter path') }}
+                                </td>
+                                <td class="form-group{{mark_errors([form.textfile_train_folder])}}">
+                                    {{ form.textfile_train_folder(class='form-control autocomplete_path') }}
                                 </td>
                             </tr>
                             <tr>
@@ -261,11 +262,14 @@ hasTestFolderChanged();
                                         Validation
                                     </label>
                                 </td>
-                                <td class="form-group{{' has-error' if form.textfile_val_images.errors}}">
+                                <td class="form-group{{mark_errors([form.textfile_val_images])}} cl-upload-files">
                                     {{ form.textfile_val_images(class='form-control') }}
                                 </td>
-                                <td class="form-group{{' has-error' if form.textfile_val_folder.errors}}">
-                                    {{ form.textfile_val_folder(class='form-control') }}
+                                <td class="form-group{{mark_errors([form.textfile_local_val_images])}} cl-local-files">
+                                    {{ form.textfile_local_val_images(class='form-control autocomplete_path',placeholder='enter path') }}
+                                </td>
+                                <td class="form-group{{mark_errors([form.textfile_val_folder])}}">
+                                    {{ form.textfile_val_folder(class='form-control autocomplete_path') }}
                                 </td>
                             </tr>
                             <tr>
@@ -275,58 +279,34 @@ hasTestFolderChanged();
                                         Test
                                     </label>
                                 </td>
-                                <td class="form-group{{' has-error' if form.textfile_test_images.errors}}">
+                                <td class="form-group{{mark_errors([form.textfile_test_images])}} cl-upload-files">
                                     {{ form.textfile_test_images(class='form-control') }}
                                 </td>
-                                <td class="form-group{{' has-error' if form.textfile_test_folder.errors}}">
-                                    {{ form.textfile_test_folder(class='form-control') }}
+                                <td class="form-group{{mark_errors([form.textfile_local_test_images])}} cl-local-files">
+                                    {{ form.textfile_local_test_images(class='form-control autocomplete_path',placeholder='enter path') }}
+                                </td>
+                                <td class="form-group{{mark_errors([form.textfile_test_folder])}}">
+                                    {{ form.textfile_test_folder(class='form-control autocomplete_path') }}
                                 </td>
                             </tr>
                         </table>
                     </div>
-                    <script>
-// Disable form fields according to the checkboxes
-function textfile_image_sets_disabled() {
-    var value = $("#textfile_use_val").prop("checked");
-    $("#textfile_val_images").prop("disabled", !value);
-    $("#textfile_val_folder").prop("disabled", !value);
-    value = $("#textfile_use_test").prop("checked");
-    $("#textfile_test_images").prop("disabled", !value);
-    $("#textfile_test_folder").prop("disabled", !value);
-}
-
-$("#textfile_use_val").click(function() {
-        textfile_image_sets_disabled();
-        });
-$("#textfile_use_test").click(function() {
-        textfile_image_sets_disabled();
-        });
-textfile_image_sets_disabled();
-                    </script>
-
                     <div class="row">
                         <div class="col-sm-6 col-sm-offset-1">
-                            <div class="form-group{{ ' has-error' if form.textfile_shuffle.errors else '' }}">
+                            <div class="form-group{{mark_errors([form.textfile_shuffle])}}">
                                 {{ form.textfile_shuffle.label }}
-                                <div class="input-group">
-                                    {{ form.textfile_shuffle(class='form-control') }}
-                                    <span name="textfile_shuffle_explanation"
-                                        class="input-group-addon explanation-tooltip glyphicon glyphicon-question-sign"
-                                        data-container="body"
-                                        title="Shuffle the list[s] of images before creating the database."
-                                        ></span>
-                                </div>
+                                {{ form.textfile_shuffle.tooltip }}
+                                {{ form.textfile_shuffle(class='form-control') }}
                             </div>
-                            <div class="form-group{{ ' has-error' if form.textfile_labels_file.errors else '' }}">
+                            <div class="form-group{{mark_errors([form.textfile_labels_file])}} cl-upload-files">
                                 {{ form.textfile_labels_file.label }}
-                                <div class="input-group">
-                                    {{ form.textfile_labels_file(class='form-control') }}
-                                    <span name="textfile_labels_file_explanation"
-                                        class="input-group-addon explanation-tooltip glyphicon glyphicon-question-sign"
-                                        data-container="body"
-                                        title="The 'i'th line of the file should give the string label associated with the '(i-1)'th numberic label. (E.g. the string label for the numeric label 0 is supposed to be on line 1.)"
-                                        ></span>
-                                </div>
+                                {{ form.textfile_labels_file.tooltip }}
+                                {{ form.textfile_labels_file(class='form-control') }}
+                            </div>
+                            <div class="form-group{{mark_errors([form.textfile_local_labels_file])}} cl-local-files">
+                                {{ form.textfile_local_labels_file.label }}
+                                {{ form.textfile_local_labels_file.tooltip }}
+                                {{ form.textfile_local_labels_file(class='form-control autocomplete_path',placeholder='enter path') }}
                             </div>
                         </div>
                     </div>
@@ -337,6 +317,52 @@ textfile_image_sets_disabled();
     </div>
     {{ form.method(style="display:none;") }}
     <script>
+// Disable form fields according to the checkboxes
+function textfile_image_sets_disabled() {
+    var value = $("#textfile_use_val").prop("checked");
+    var useLocalFiles = $("#textfile_use_local_files").prop("checked");
+    if (useLocalFiles) {
+        $(".cl-upload-files").hide();
+        $(".cl-local-files").show();
+    }
+    else{
+        $(".cl-upload-files").show();
+        $(".cl-local-files").hide();
+    }
+
+     if (value) {
+         $("#textfile_val_images_btn").removeClass("disabled");
+     } else {
+         $("#textfile_val_images_btn").addClass("disabled");
+     }
+
+    $("#textfile_val_images_text").prop("disabled", !value);
+    $("#textfile_local_val_images").prop("disabled", !value);
+    $("#textfile_val_folder").prop("disabled", !value);
+    value = $("#textfile_use_test").prop("checked");
+
+     if (value) {
+         $("#textfile_test_images_btn").removeClass("disabled");
+     } else {
+         $("#textfile_test_images_btn").addClass("disabled");
+     }
+
+    $("#textfile_test_images_text").prop("disabled", !value);
+    $("#textfile_local_test_images").prop("disabled", !value);
+    $("#textfile_test_folder").prop("disabled", !value);
+}
+
+$("#textfile_use_val").click(function() {
+        textfile_image_sets_disabled();
+        });
+$("#textfile_use_test").click(function() {
+        textfile_image_sets_disabled();
+        });
+$("#textfile_use_local_files").click(function() {
+        textfile_image_sets_disabled();
+        });
+textfile_image_sets_disabled();
+
 function update_db_tab(tabName) {
     $('select[name=method]').val( tabName );
 }
@@ -350,7 +376,50 @@ $('#db-tabs a[href="#db-{{ form.method.data }}"]').tab('show');
 
     <div class="row">
         <div class="col-sm-6 col-sm-offset-3 well">
-            <div class="form-group{{ ' has-error' if form.dataset_name.errors else '' }}">
+            <div class="form-group{{mark_errors([form.backend])}}">
+                {{ form.backend.label }}
+                {{ form.backend.tooltip }}
+                {{ form.backend(class='form-control') }}
+            </div>
+            <div id="backend-hdf5-warning" class="alert alert-warning" style="display:none;">
+                <b>NOTE:</b> HDF5 is not fully supported by Caffe or by DIGITS
+                <ul>
+                    <li>The standard networks will need some minor customizations before use (change <i>Data</i> layers to <i>HDF5Data</i> layers)</li>
+                    <li><i>HDF5Data</i> layers do not support mean subtraction</li>
+                </ul>
+            </div>
+            <div class="form-group{{mark_errors([form.compression])}}">
+                <div class="form-group{{mark_errors([form.compression])}}">
+                    {{form.compression.label}}
+                    {{form.compression.tooltip}}
+                    {{form.compression(class='form-control')}}
+                </div>
+            </div>
+            <div class="form-group{{mark_errors([form.encoding])}}">
+                <div class="form-group{{mark_errors([form.encoding])}}">
+                    {{form.encoding.label}}
+                    {{form.encoding.tooltip}}
+                    {{form.encoding(class='form-control')}}
+                </div>
+            </div>
+            <script>
+function backendChanged()
+{
+    val = $("#backend").val();
+    if (val == 'lmdb') {
+        $("#compression").parent().hide();
+        $("#encoding").parent().show();
+        $("#backend-hdf5-warning").hide();
+    } else if (val == 'hdf5') {
+        $("#encoding").parent().hide();
+        $("#compression").parent().show();
+        $("#backend-hdf5-warning").show();
+    }
+}
+$("#backend").change(backendChanged);
+backendChanged();
+            </script>
+            <div class="form-group{{mark_errors([form.dataset_name])}}">
                 {{ form.dataset_name.label }}
                 {{ form.dataset_name(class='form-control') }}
             </div>

@@ -4,16 +4,10 @@ import os
 import re
 import tempfile
 import random
-
+import shutil
 import flask
 import werkzeug.exceptions
 import numpy as np
-from google.protobuf import text_format
-try:
-    import caffe_pb2
-except ImportError:
-    # See issue #32
-    from caffe.proto import caffe_pb2
 
 import digits
 from digits.config import config_value
@@ -21,10 +15,14 @@ from digits import utils
 from digits.utils.routing import request_wants_json, job_from_request
 from digits.webapp import app, scheduler, autodoc
 from digits.dataset import ImageClassificationDatasetJob
-from digits.model import tasks
+from digits import frameworks
 from forms import ImageClassificationModelForm
 from job import ImageClassificationModelJob
 from digits.status import Status
+import platform
+from digits.utils import errors
+from digits.utils.forms import fill_form_if_cloned, save_form_to_job
+from digits.utils import filesystem as fs
 
 NAMESPACE   = '/models/images/classification'
 
@@ -42,9 +40,14 @@ def image_classification_model_new():
 
     prev_network_snapshots = get_previous_network_snapshots()
 
+    ## Is there a request to clone a job with ?clone=<job_id>
+    fill_form_if_cloned(form)
+
     return flask.render_template('models/images/classification/new.html',
             form = form,
+            frameworks = frameworks.get_frameworks(),
             previous_network_snapshots = prev_network_snapshots,
+            previous_networks_fullinfo = get_previous_networks_fulldetails(),
             multi_gpu = config_value('caffe_root')['multi_gpu'],
             )
 
@@ -65,13 +68,18 @@ def image_classification_model_create():
 
     prev_network_snapshots = get_previous_network_snapshots()
 
+    ## Is there a request to clone a job with ?clone=<job_id>
+    fill_form_if_cloned(form)
+
     if not form.validate_on_submit():
         if request_wants_json():
             return flask.jsonify({'errors': form.errors}), 400
         else:
             return flask.render_template('models/images/classification/new.html',
                     form = form,
+                    frameworks = frameworks.get_frameworks(),
                     previous_network_snapshots = prev_network_snapshots,
+                    previous_networks_fullinfo = get_previous_networks_fulldetails(),
                     multi_gpu = config_value('caffe_root')['multi_gpu'],
                     ), 400
 
@@ -86,21 +94,19 @@ def image_classification_model_create():
                 name        = form.model_name.data,
                 dataset_id  = datasetJob.id(),
                 )
+        # get handle to framework object
+        fw = frameworks.get_framework_by_id(form.framework.data)
 
-        network = caffe_pb2.NetParameter()
         pretrained_model = None
         if form.method.data == 'standard':
             found = False
-            networks_dir = os.path.join(os.path.dirname(digits.__file__), 'standard-networks')
-            for filename in os.listdir(networks_dir):
-                path = os.path.join(networks_dir, filename)
-                if os.path.isfile(path):
-                    match = re.match(r'%s.prototxt' % form.standard_networks.data, filename)
-                    if match:
-                        with open(path) as infile:
-                            text_format.Merge(infile.read(), network)
-                        found = True
-                        break
+
+            # can we find it in standard networks?
+            network_desc = fw.get_standard_network_desc(form.standard_networks.data)
+            if network_desc:
+                found = True
+                network = fw.get_network_from_desc(network_desc)
+
             if not found:
                 raise werkzeug.exceptions.BadRequest(
                         'Unknown standard model "%s"' % form.standard_networks.data)
@@ -110,17 +116,16 @@ def image_classification_model_create():
                 raise werkzeug.exceptions.BadRequest(
                         'Job not found: %s' % form.previous_networks.data)
 
-            network.CopyFrom(old_job.train_task().network)
-            # Rename the final layer
-            # XXX making some assumptions about network architecture here
-            ip_layers = [l for l in network.layer if l.type == 'InnerProduct']
-            if len(ip_layers) > 0:
-                ip_layers[-1].name = '%s_retrain' % ip_layers[-1].name
+            network = fw.get_network_from_previous(old_job.train_task().network)
 
             for choice in form.previous_networks.choices:
                 if choice[0] == form.previous_networks.data:
                     epoch = float(flask.request.form['%s-snapshot' % form.previous_networks.data])
-                    if epoch != 0:
+                    if epoch == 0:
+                        pass
+                    elif epoch == -1:
+                        pretrained_model = old_job.train_task().pretrained_model
+                    else:
                         for filename, e in old_job.train_task().snapshots:
                             if e == epoch:
                                 pretrained_model = filename
@@ -136,7 +141,7 @@ def image_classification_model_create():
                     break
 
         elif form.method.data == 'custom':
-            text_format.Merge(form.custom_network.data, network)
+            network = fw.get_network_from_desc(form.custom_network.data)
             pretrained_model = form.custom_network_snapshot.data.strip()
         else:
             raise werkzeug.exceptions.BadRequest(
@@ -166,12 +171,15 @@ def image_classification_model_create():
                     'Invalid learning rate policy')
 
         if config_value('caffe_root')['multi_gpu']:
-            if form.select_gpu_count.data:
+            if form.select_gpus.data:
+                selected_gpus = [str(gpu) for gpu in form.select_gpus.data]
+                gpu_count = None
+            elif form.select_gpu_count.data:
                 gpu_count = form.select_gpu_count.data
                 selected_gpus = None
             else:
-                selected_gpus = [str(gpu) for gpu in form.select_gpus.data]
-                gpu_count = None
+                gpu_count = 1
+                selected_gpus = None
         else:
             if form.select_gpu.data == 'next':
                 gpu_count = 1
@@ -180,8 +188,15 @@ def image_classification_model_create():
                 selected_gpus = [str(form.select_gpu.data)]
                 gpu_count = None
 
-        job.tasks.append(
-                tasks.CaffeTrainTask(
+        # Python Layer File may be on the server or copied from the client.
+        fs.copy_python_layer_file(
+            bool(form.python_layer_from_client.data),
+            job.dir(),
+            (flask.request.files[form.python_layer_client_file.name]
+             if form.python_layer_client_file.name in flask.request.files
+             else ''), form.python_layer_server_file.data)
+
+        job.tasks.append(fw.create_train_task(
                     job_dir         = job.dir(),
                     dataset         = datasetJob,
                     train_epochs    = form.train_epochs.data,
@@ -194,12 +209,16 @@ def image_classification_model_create():
                     val_interval    = form.val_interval.data,
                     pretrained_model= pretrained_model,
                     crop_size       = form.crop_size.data,
-                    use_mean        = bool(form.use_mean.data),
+                    use_mean        = form.use_mean.data,
                     network         = network,
                     random_seed     = form.random_seed.data,
                     solver_type     = form.solver_type.data,
+                    shuffle         = form.shuffle.data,
                     )
                 )
+
+        ## Save form data with the job so we can easily clone it later.
+        save_form_to_job(job, form)
 
         scheduler.add_job(job)
         if request_wants_json():
@@ -216,7 +235,7 @@ def show(job):
     """
     Called from digits.model.views.models_show()
     """
-    return flask.render_template('models/images/classification/show.html', job=job)
+    return flask.render_template('models/images/classification/show.html', job=job, framework_ids = [fw.get_id() for fw in frameworks.get_frameworks()])
 
 @app.route(NAMESPACE + '/large_graph', methods=['GET'])
 @autodoc('models')
@@ -243,9 +262,11 @@ def image_classification_model_classify_one():
     if 'image_url' in flask.request.form and flask.request.form['image_url']:
         image = utils.image.load_image(flask.request.form['image_url'])
     elif 'image_file' in flask.request.files and flask.request.files['image_file']:
-        with tempfile.NamedTemporaryFile() as outfile:
-            flask.request.files['image_file'].save(outfile.name)
-            image = utils.image.load_image(outfile.name)
+        outfile = tempfile.mkstemp(suffix='.bin')
+        flask.request.files['image_file'].save(outfile[1])
+        image = utils.image.load_image(outfile[1])
+        os.close(outfile[0])
+        os.remove(outfile[1])
     else:
         raise werkzeug.exceptions.BadRequest('must provide image_url or image_file')
 
@@ -253,9 +274,6 @@ def image_classification_model_classify_one():
     db_task = job.train_task().dataset.train_db_task()
     height = db_task.image_dims[0]
     width = db_task.image_dims[1]
-    if job.train_task().crop_size:
-        height = job.train_task().crop_size
-        width = job.train_task().crop_size
     image = utils.image.resize_image(image, height, width,
             channels = db_task.image_dims[2],
             resize_mode = db_task.resize_mode,
@@ -269,17 +287,22 @@ def image_classification_model_classify_one():
     if 'show_visualizations' in flask.request.form and flask.request.form['show_visualizations']:
         layers = 'all'
 
+    predictions, visualizations = None, None
     predictions, visualizations = job.train_task().infer_one(image, snapshot_epoch=epoch, layers=layers)
+
     # take top 5
-    predictions = [(p[0], round(100.0*p[1],2)) for p in predictions[:5]]
+    if predictions:
+        predictions = [(p[0], round(100.0*p[1],2)) for p in predictions[:5]]
 
     if request_wants_json():
         return flask.jsonify({'predictions': predictions})
     else:
         return flask.render_template('models/images/classification/classify_one.html',
+                job             = job,
                 image_src       = utils.image.embed_image_html(image),
                 predictions     = predictions,
                 visualizations  = visualizations,
+                total_parameters= sum(v['param_count'] for v in visualizations if v['vis_type'] == 'Weights'),
                 )
 
 @app.route(NAMESPACE + '/classify_many.json', methods=['POST'])
@@ -303,6 +326,7 @@ def image_classification_model_classify_many():
 
     paths = []
     images = []
+    ground_truths = []
     dataset = job.train_task().dataset
 
     for line in image_list.readlines():
@@ -312,11 +336,13 @@ def image_classification_model_classify_many():
 
         path = None
         # might contain a numerical label at the end
-        match = re.match(r'(.*\S)\s+\d+$', line)
+        match = re.match(r'(.*\S)\s+(\d+)$', line)
         if match:
             path = match.group(1)
+            ground_truth = int(match.group(2))
         else:
             path = line
+            ground_truth = None
 
         try:
             image = utils.image.load_image(path)
@@ -327,6 +353,7 @@ def image_classification_model_classify_many():
                     )
             paths.append(path)
             images.append(image)
+            ground_truths.append(ground_truth)
         except utils.errors.LoadImageError as e:
             print e
 
@@ -349,13 +376,19 @@ def image_classification_model_classify_many():
             result.append((labels[i], round(100.0*scores[image_index, i],2)))
         classifications.append(result)
 
+    # replace ground truth indices with labels
+    ground_truths = [labels[x] if x is not None and (0 <= x < len(labels)) else None for x in ground_truths]
+
     if request_wants_json():
         joined = dict(zip(paths, classifications))
         return flask.jsonify({'classifications': joined})
     else:
         return flask.render_template('models/images/classification/classify_many.html',
-                paths=paths,
-                classifications=classifications,
+                job             = job,
+                paths           = paths,
+                classifications = classifications,
+                show_ground_truth= not(ground_truths == [None]*len(ground_truths)),
+                ground_truths   = ground_truths
                 )
 
 @app.route(NAMESPACE + '/top_n', methods=['POST'])
@@ -465,12 +498,21 @@ def get_previous_networks():
         )
         ]
 
+def get_previous_networks_fulldetails():
+    return [(j) for j in sorted(
+        [j for j in scheduler.jobs if isinstance(j, ImageClassificationModelJob)],
+        cmp=lambda x,y: cmp(y.id(), x.id())
+        )
+        ]
+
 def get_previous_network_snapshots():
     prev_network_snapshots = []
     for job_id, _ in get_previous_networks():
         job = scheduler.get_job(job_id)
         e = [(0, 'None')] + [(epoch, 'Epoch #%s' % epoch)
                 for _, epoch in reversed(job.train_task().snapshots)]
+        if job.train_task().pretrained_model:
+            e.insert(0, (-1, 'Previous pretrained model'))
         prev_network_snapshots.append(e)
     return prev_network_snapshots
 

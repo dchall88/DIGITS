@@ -12,11 +12,8 @@ import urllib
 
 import requests
 
-try:
-    import digits
-except ImportError:
-    # Add path for DIGITS package
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add path for DIGITS package
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import digits.config
 digits.config.load_config()
 from digits import utils, log
@@ -330,6 +327,8 @@ def parse_folder(folder, labels_file,
         else:
             logger.error('folder does not exist')
             return False
+
+    subdirs.sort()
 
     if len(subdirs) < 2:
         logger.error('folder must contain at least two subdirectories')

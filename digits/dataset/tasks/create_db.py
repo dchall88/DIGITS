@@ -17,11 +17,12 @@ PICKLE_VERSION = 3
 class CreateDbTask(Task):
     """Creates a database"""
 
-    def __init__(self, input_file, db_name, image_dims, **kwargs):
+    def __init__(self, input_file, db_name, backend, image_dims, **kwargs):
         """
         Arguments:
         input_file -- read images and labels from this file
         db_name -- save database to this location
+        backend -- database backend (lmdb/hdf5)
         image_dims -- (height, width, channels)
 
         Keyword Arguments:
@@ -29,8 +30,8 @@ class CreateDbTask(Task):
         shuffle -- shuffle images before saving
         resize_mode -- used in utils.image.resize_image()
         encoding -- 'none', 'png' or 'jpg'
+        compression -- 'none' or 'gzip'
         mean_file -- save mean file to this location
-        backend -- type of database to use
         labels_file -- used to print category distribution
         """
         # Take keyword arguments out of kwargs
@@ -38,8 +39,8 @@ class CreateDbTask(Task):
         self.shuffle = kwargs.pop('shuffle', True)
         self.resize_mode = kwargs.pop('resize_mode' , None)
         self.encoding = kwargs.pop('encoding', None)
+        self.compression = kwargs.pop('compression', None)
         self.mean_file = kwargs.pop('mean_file', None)
-        self.backend = kwargs.pop('backend', None)
         self.labels_file = kwargs.pop('labels_file', None)
 
         super(CreateDbTask, self).__init__(**kwargs)
@@ -47,6 +48,10 @@ class CreateDbTask(Task):
 
         self.input_file = input_file
         self.db_name = db_name
+        self.backend = backend
+        if backend == 'hdf5':
+            # the list of hdf5 files is stored in a textfile
+            self.textfile = os.path.join(self.db_name, 'list.txt')
         self.image_dims = image_dims
         if image_dims[2] == 3:
             self.image_channel_order = 'BGR'
@@ -55,9 +60,13 @@ class CreateDbTask(Task):
 
         self.entries_count = None
         self.distribution = None
+        self.create_db_log_file = "create_%s.log" % db_name
 
     def __getstate__(self):
         d = super(CreateDbTask, self).__getstate__()
+        if 'create_db_log' in d:
+            # don't save file handle
+            del d['create_db_log']
         if 'labels' in d:
             del d['labels']
         return d
@@ -85,6 +94,11 @@ class CreateDbTask(Task):
                 self.encoding = 'none'
         self.pickver_task_createdb = PICKLE_VERSION
 
+        if not hasattr(self, 'backend') or self.backend is None:
+            self.backend = 'lmdb'
+        if not hasattr(self, 'compression') or self.compression is None:
+            self.compression = 'none'
+
     @override
     def name(self):
         if self.db_name == utils.constants.TRAIN_DB or 'train' in self.db_name.lower():
@@ -95,6 +109,11 @@ class CreateDbTask(Task):
             return 'Create DB (test)'
         else:
             return 'Create DB (%s)' % self.db_name
+
+    @override
+    def before_run(self):
+        super(CreateDbTask, self).before_run()
+        self.create_db_log = open(self.path(self.create_db_log_file), 'a')
 
     @override
     def html_id(self):
@@ -118,7 +137,7 @@ class CreateDbTask(Task):
         return None
 
     @override
-    def task_arguments(self, resources):
+    def task_arguments(self, resources, env):
         args = [sys.executable, os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(digits.__file__))),
             'tools', 'create_db.py'),
@@ -126,6 +145,7 @@ class CreateDbTask(Task):
                 self.path(self.db_name),
                 self.image_dims[1],
                 self.image_dims[0],
+                '--backend=%s' % self.backend,
                 '--channels=%s' % self.image_dims[2],
                 '--resize_mode=%s' % self.resize_mode,
                 ]
@@ -140,12 +160,19 @@ class CreateDbTask(Task):
             args.append('--shuffle')
         if self.encoding and self.encoding != 'none':
             args.append('--encoding=%s' % self.encoding)
+        if self.compression and self.compression != 'none':
+            args.append('--compression=%s' % self.compression)
+        if self.backend == 'hdf5':
+            args.append('--hdf5_dset_limit=%d' % 2**31)
 
         return args
 
     @override
     def process_output(self, line):
         from digits.webapp import socketio
+
+        self.create_db_log.write('%s\n' % line)
+        self.create_db_log.flush()
 
         timestamp, level, message = self.preprocess_output_digits(line)
         if not message:
@@ -155,16 +182,7 @@ class CreateDbTask(Task):
         match = re.match(r'Processed (\d+)\/(\d+)', message)
         if match:
             self.progress = float(match.group(1))/int(match.group(2))
-            socketio.emit('task update',
-                    {
-                        'task': self.html_id(),
-                        'update': 'progress',
-                        'percentage': int(round(100*self.progress)),
-                        'eta': utils.time_filters.print_time_diff(self.est_done()),
-                        },
-                    namespace='/jobs',
-                    room=self.job_id,
-                    )
+            self.emit_progress_update()
             return True
 
         # distribution
@@ -189,7 +207,7 @@ class CreateDbTask(Task):
             return True
 
         # result
-        match = re.match(r'Total images added: (\d+)', message)
+        match = re.match(r'(\d+) images written to database', message)
         if match:
             self.entries_count = int(match.group(1))
             self.logger.debug(message)
@@ -204,6 +222,22 @@ class CreateDbTask(Task):
             return True
 
         return True
+
+    @override
+    def after_run(self):
+        super(CreateDbTask, self).after_run()
+        self.create_db_log.close()
+
+        if self.backend == 'hdf5':
+            # add more path information to the list of h5 files
+            lines = None
+            with open(self.path(self.textfile)) as infile:
+                lines = infile.readlines()
+            with open(self.path(self.textfile), 'w') as outfile:
+                for line in lines:
+                    # XXX this works because the model job will be in an adjacent folder
+                    outfile.write('%s\n' % os.path.join(
+                        '..', self.job_id, self.db_name, line.strip()))
 
     def get_labels(self):
         """
