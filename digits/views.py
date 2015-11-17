@@ -16,14 +16,17 @@ from config import config_value
 from webapp import app, socketio, scheduler, autodoc
 import dataset.views
 import model.views
+import experiment.views
+import trial.views
 from digits.utils import errors
 from digits.utils.routing import request_wants_json
 from digits.log import logger
 
 @app.route('/index.json', methods=['GET'])
 @app.route('/', methods=['GET'])
+@app.route('/model/<dataset_id>', methods=['GET'])
 @autodoc(['home', 'api'])
-def home():
+def home(dataset_id=None):
     """
     DIGITS home page
     Returns information about each job on the server
@@ -34,71 +37,103 @@ def home():
             models: [{id, name, status},...]
         }
     """
-    running_datasets    = get_job_list(dataset.DatasetJob, True)
-    completed_datasets  = get_job_list(dataset.DatasetJob, False)
-    running_models      = get_job_list(model.ModelJob, True)
-    completed_models    = get_job_list(model.ModelJob, False)
+
+    # Dataset Job
+    if dataset_id is None:
+        job_type = dataset.DatasetJob
+    # Model Job
+    else:
+        job_type = dataset.ModelJob
+
+    running_jobs = get_job_list(job_type, True, dataset_id)
+    completed_jobs = get_job_list(job_type, False, dataset_id)
 
     if request_wants_json():
-        data = {
-                'version': digits.__version__,
-                'jobs_dir': config_value('jobs_dir'),
-                'datasets': [j.json_dict()
-                    for j in running_datasets + completed_datasets],
-                'models': [j.json_dict()
-                    for j in running_models + completed_models],
-                }
-        if config_value('server_name'):
-            data['server_name'] = config_value('server_name')
-        return flask.jsonify(data)
+        pass
+        # data = {
+        #         'version': digits.__version__,
+        #         'jobs_dir': config_value('jobs_dir'),
+        #         'datasets': [j.json_dict()
+        #             for j in running_datasets + completed_datasets],
+        #         'models': [j.json_dict()
+        #             for j in running_models + completed_models],
+        #         }
+        # if config_value('server_name'):
+        #     data['server_name'] = config_value('server_name')
+        # return flask.jsonify(data)
     else:
-        new_dataset_options = [
-                ('Images', [
-                    {
-                        'title': 'Classification',
-                        'id': 'image-classification',
-                        'url': flask.url_for('image_classification_dataset_new'),
-                        },
-                    {
-                        'title': 'Other',
-                        'id': 'image-generic',
-                        'url': flask.url_for('generic_image_dataset_new'),
-                        },
-                    ])
-                ]
-        new_model_options = [
-                ('Images', [
-                    {
-                        'title': 'Classification',
-                        'id': 'image-classification',
-                        'url': flask.url_for('image_classification_model_new'),
-                        },
-                    {
-                        'title': 'Other',
-                        'id': 'image-generic',
-                        'url': flask.url_for('generic_image_model_new'),
-                        },
-                    ])
-                ]
+        if dataset_id is None:
+            name = 'Dataset'
+            dataset_name = None
+            options = [
+                    ('New Dataset', [
+                        {
+                            'title': 'Images',
+                            'id': 'images',
+                            'url': flask.url_for('image_dataset_new'),
+                            },
+                         {
+                            'title': 'Bounding Boxes',
+                            'id': 'bboxes',
+                            'url': flask.url_for('bounding_box_dataset_new'),
+                            },
+                        {
+                            'title': 'Generic',
+                            'id': 'generic',
+                            'url': flask.url_for('generic_dataset_new'),
+                            },
+                        ])
+                    ]
+        else:
+            name = 'Model'
+            dataset_name = get_dataset_name(dataset_id)
+            options = [
+                    ('New Model', [
+                        {
+                            'title': 'Classification',
+                            'id': 'classification',
+                            'url': flask.url_for('classification_model_new'),
+                            },
+                        {
+                            'title': 'Generic',
+                            'id': 'generic-classification',
+                            'url': flask.url_for('generic_model_new'),
+                            },
+                        ])
+                    ]
 
-        return flask.render_template('home.html',
-                new_dataset_options = new_dataset_options,
-                running_datasets    = running_datasets,
-                completed_datasets  = completed_datasets,
-                new_model_options   = new_model_options,
-                running_models      = running_models,
-                completed_models    = completed_models,
-                total_gpu_count     = len(scheduler.resources['gpus']),
-                remaining_gpu_count = sum(r.remaining() for r in scheduler.resources['gpus']),
-                )
+        return flask.render_template(
+            'home.html',
+            name=name,
+            dataset_name=dataset_name,
+            dataset_id=dataset_id,
+            options=options,
+            running=running_jobs,
+            completed=completed_jobs,
+            total_gpu_count=len(scheduler.resources['gpus']),
+            remaining_gpu_count=sum(r.remaining() for r in scheduler.resources['gpus']),
+            )
 
-def get_job_list(cls, running):
-    return sorted(
-            [j for j in scheduler.jobs if isinstance(j, cls) and j.status.is_running() == running],
+
+def get_job_list(cls, running, dataset_id=None):
+    if dataset_id:
+            return sorted(
+            [j for j in scheduler.jobs if isinstance(j, cls) and j.status.is_running() == running and (j.dataset_id == dataset_id)],
             key=lambda j: j.status_history[0][1],
             reverse=True,
             )
+    else:
+        return sorted(
+                [j for j in scheduler.jobs if isinstance(j, cls) and j.status.is_running() == running],
+                key=lambda j: j.status_history[0][1],
+                reverse=True,
+                )
 
+
+def get_dataset_name(job_id):
+    for j in scheduler.jobs:
+        if isinstance(j, dataset.DatasetJob) and j.id() == job_id:
+            return j.name()
 
 ### Jobs routes
 
@@ -116,6 +151,10 @@ def show_job(job_id):
         return flask.redirect(flask.url_for('datasets_show', job_id=job_id))
     if isinstance(job, model.ModelJob):
         return flask.redirect(flask.url_for('models_show', job_id=job_id))
+    if isinstance(job, experiment.ExperimentJob):
+        return flask.redirect(flask.url_for('experiments_show', job_id=job_id))
+    if isinstance(job, trial.TrialJob):
+        return flask.redirect(flask.url_for('trials_show', job_id=job_id))
     else:
         raise werkzeug.exceptions.BadRequest('Invalid job type')
 

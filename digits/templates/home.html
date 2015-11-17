@@ -4,6 +4,15 @@
 
 {% extends "layout.html" %}
 
+{% block nav %}
+{% if name == 'Dataset' %}
+<li class="active"><a href="{{ url_for('home')}}">Datasets</a></li>
+{% elif name == 'Model' %}
+<li><a href="{{ url_for('home')}}">Datasets</a></li>
+<li class="active"><a href="{{ url_for('home_model', dataset_id=dataset_id)}}">Models</a></li>
+{% endif %}
+{% endblock %}
+
 {% block content %}
 <script>
 function deleteJob(job_id) {
