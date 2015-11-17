@@ -123,6 +123,7 @@ def from_folders(job, form):
                     encoding    = encoding,
                     compression = compression,
                     labels_file = job.labels_file,
+                    shuffle     = False,
                     )
                 )
 
@@ -139,6 +140,7 @@ def from_folders(job, form):
                     encoding    = encoding,
                     compression = compression,
                     labels_file = job.labels_file,
+                    shuffle     = False,
                     )
                 )
 
@@ -217,7 +219,7 @@ def from_files(job, form):
                     encoding    = encoding,
                     compression = compression,
                     labels_file = job.labels_file,
-                    shuffle     = shuffle,
+                    shuffle     = False,
                     )
                 )
 
@@ -248,7 +250,7 @@ def from_files(job, form):
                     encoding    = encoding,
                     compression = compression,
                     labels_file = job.labels_file,
-                    shuffle     = shuffle,
+                    shuffle     = False,
                     )
                 )
 
