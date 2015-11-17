@@ -1,0 +1,56 @@
+{# Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved. #}
+<div class="row">
+    <div class="col-sm-12">
+        <dl>
+            <dt>Experiment</dt>
+            <dd>
+                <h4 style="display:inline;">
+                    <a href="{{url_for('show_job', job_id=experiment.id())}}">
+                        {{experiment.name()}}
+                    </a>
+                </h4>
+                <p style="display:inline;">
+                <span class="text-{{experiment.status.css}}">{{experiment.status.name}}</span>
+                {% if not experiment.status.is_running() %}
+                <small>
+                    {{experiment.status_history[-1][1]|print_time}}
+                </small>
+                {% endif %}
+                </p>
+            </dd>
+            <dt>Dataset</dt>
+            <dd>
+                <h4 style="display:inline;">
+                    <a href="{{url_for('show_job', job_id=experiment.dataset.id())}}" target="_blank">
+                        {{experiment.dataset.name()}}
+                    </a>
+                </h4>
+                <p style="display:inline;">
+                <span class="text-{{experiment.dataset.status.css}}">{{experiment.dataset.status.name}}</span>
+                {% if not experiment.dataset.status.is_running() %}
+                <small>
+                    {{experiment.dataset.status_history[-1][1]|print_time}}
+                </small>
+                {% endif %}
+                </p>
+            </dd>
+            <dt>Model</dt>
+            <dd>
+                <h4 style="display:inline;">
+                    <a href="{{url_for('show_job', job_id=experiment.model.id())}}" target="_blank">
+                        {{experiment.model.name()}}
+                    </a>
+                </h4>
+                <p style="display:inline;">
+                <span class="text-{{experiment.model.status.css}}">{{experiment.model.status.name}}</span>
+                {% if not experiment.model.status.is_running() %}
+                <small>
+                    {{experiment.model.status_history[-1][1]|print_time}}
+                </small>
+                {% endif %}
+                </p>
+            </dd>
+        </dl>
+    </div>
+</div>
+

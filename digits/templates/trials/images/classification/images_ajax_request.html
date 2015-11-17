@@ -1,0 +1,13 @@
+    <script>
+        $('#page-selection').bootpag({
+            total: 10,
+            maxVisible: 5,
+        }).on("page", function(event, num){
+        
+        $.getJSON("{{ url_for('get_subset_of_hit_results', job_id=job_id) }}", {num: num}, function(data) { $("#content").text(data.result); });
+        
+       
+                    
+             
+        });
+    </script>

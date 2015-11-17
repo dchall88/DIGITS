@@ -1,0 +1,187 @@
+{# Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved. #}
+
+{% from "helper.html" import print_flashes %}
+
+{% extends "layout.html" %}
+
+{% block title %}
+New Image Classification Trial
+{% endblock %}
+
+{% block nav %}
+<li><a href="{{ url_for('home')}}">Datasets</a></li>
+<li><a href="{{ url_for('home_model', dataset_id=experiment.dataset_id)}}">Models</a></li>
+<li><a href="{{ url_for('experiments_show', job_id=experiment.id())}}">Experiments</a></li>
+<li class="active"><a href="{{url_for('image_classification_trial_new', experiment_id=experiment.id())}}">New Trial</a></li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>New Image Classification Trial</h1>
+</div>
+
+<form id="trial-form" action="{{url_for('image_classification_trial_create', experiment_id=experiment.id())}}" enctype="multipart/form-data" method="post">
+    {{ form.hidden_tag() }}
+
+    {% if form.errors %}
+        <div class="alert alert-danger">
+            {% for field, errors in form.errors.items() %}
+                <li>{{ field }}
+                    <ul>
+                        {% for e in errors %}
+                            <li>{{ e }}</li>
+                        {% endfor %}
+                    </ul>
+                </li>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-sm-6">
+            <div class="well">
+            <a class="btn btn-s btn-info" href="{{ url_for('show_job', job_id=experiment.dataset.id()) }}" target="_blank"> Dataset - {{experiment.dataset.name()}}</a>
+            <a class="btn btn-s btn-info" href="{{ url_for('show_job', job_id=experiment.model.id()) }}" target="_blank"> Model - {{experiment.model.name()}}</a>  
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+
+        <div class="col-sm-3">
+            <div id="category names" class="well">
+                <div class="form-group{{' has-error' if form.category_names.errors}}">
+                    {{form.category_names.label}}
+                    <span name="type_explanation"
+                        class="explanation-tooltip glyphicon glyphicon-question-sign"
+                        data-container="body"
+                        title="Choose the category you would like to use in your trial."
+                        ></span>
+                    {{form.category_names(class='form-control', size=5)}}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-3">
+            <div class="well">
+                <div class="form-group{{' has-error' if form.learning_method.errors}}">
+                    {{form.learning_method.label}}
+                    <span name="type_explanation"
+                        class="explanation-tooltip glyphicon glyphicon-question-sign"
+                        data-container="body"
+                        title="Choose the learning algorithm you would like to use."
+                        ></span>
+                    {{form.learning_method(class='form-control', id='learning_method', size=5)}}
+                </div>
+            </div>
+        </div>
+
+    <script>
+    $("#learning_method").change(function () {
+        if(this.value == 'dnn'){
+            $("#layers").hide()
+            $("#svm_params").hide()
+            $("#boost_params").hide()
+        } else if(this.value == 'svm'){
+            $("#layers").show()
+            $("#svm_params").show()
+            $("#boost_params").hide()
+        } else if(this.value == 'adaboost'){
+            $("#layers").show()
+            $("#svm_params").hide()
+            $("#boost_params").show()
+        };
+        
+    });
+    </script>
+
+
+        <div class="col-sm-3">
+            <div id="layers" class="well" style="display:none;">
+                <div class="form-group{{' has-error' if form.layers.errors}}">
+                    {{form.layers.label}}
+                    <span name="type_explanation"
+                        class="explanation-tooltip glyphicon glyphicon-question-sign"
+                        data-container="body"
+                        title="Choose the extracted feature layer you would like to use in your trial."
+                        ></span>
+                    {{form.layers(class='form-control', size=5)}}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-3">
+            <div id="svm_params" class="well" style="display:none;">
+                <div class="form-group{{' has-error' if form.normalise.errors}}">
+                    {{form.normalise.label}}
+                    <span name="type_explanation"
+                        class="explanation-tooltip glyphicon glyphicon-question-sign"
+                        data-container="body"
+                        title="Normalise each sample independently"
+                        ></span>
+                    {{form.normalise(class='form-control')}}
+                </div>
+                <div class="form-group{{' has-error' if form.C.errors}}">
+                    {{form.C.label}}
+                    <span name="type_explanation"
+                        class="explanation-tooltip glyphicon glyphicon-question-sign"
+                        data-container="body"
+                        title="The penalty parameter C for sklearns LinearSVC"
+                        ></span>
+                    {{form.C(class='form-control')}}
+                </div>
+                <div class="form-group{{' has-error' if form.class_weight.errors}}">
+                    {{form.class_weight.label}}
+                    <span name="type_explanation"
+                        class="explanation-tooltip glyphicon glyphicon-question-sign"
+                        data-container="body"
+                        title="Must be 'auto' or 'none'"
+                        ></span>
+                    {{form.class_weight(class='form-control')}}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-3">
+            <div id="boost_params" class="well" style="display:none;">
+                <div class="form-group{{' has-error' if form.adaboost_parameters.errors}}">
+                    {{form.adaboost_parameters.label}}
+                    <span name="type_explanation"
+                        class="explanation-tooltip glyphicon glyphicon-question-sign"
+                        data-container="body"
+                        title="A string of parameters to pass to sklearns AdaBoost."
+                        ></span>
+                    {{form.adaboost_parameters(class='form-control')}}
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="row">
+        <div class="col-sm-6">
+            <div class="well">
+                <div class="form-group{{' has-error' if form.trial_name.errors}}">
+                    {{form.trial_name.label}}
+                    <div class="input-group">
+                        {{form.trial_name(class='form-control')}}
+                        <span name="trial_name_explanation"
+                            class="input-group-addon explanation-tooltip glyphicon glyphicon-question-sign"
+                            data-container="body"
+                            title="An identifier, later used to refer to this trial in the Application."
+                        ></span>
+
+                    </div>
+                </div>
+                <input type="submit" name="create-trial" class="btn btn-primary" value="Create">
+            </div>
+        </div>
+    </div>
+
+</form>
+
+<script>
+$(".explanation-tooltip").tooltip();
+</script>
+
+{% endblock %}

@@ -1,0 +1,106 @@
+{# Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved. #}
+
+{% from "helper.html" import print_flashes %}
+
+{% extends "layout.html" %}
+
+{% block title %}
+Display Results
+{% endblock %}
+
+{% block head %}
+<script src="{{ url_for('static', filename='js/jquery.bootpag.min.js') }}"></script>
+
+{% endblock %}
+
+{% block nav %}
+<li class="active"><a href="{{url_for('trials_show', job_id=job_id)}}">Trial</a></li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Display Results for Class {{class_example}}</h1>
+</div>
+
+
+
+    <div class="row">
+
+        <div class="col-sm-4">
+            <h3> <b> Missed Examples </b> </h3>
+
+            <div id="page-selection-miss"></div>   
+                <div class="well">                
+                    <dl id="miss-list">
+                        {% for predicted_label, score, key, index in miss_results[:10]  %}
+                            <dt> {{loop.index}}. Predicted Label = {{ predicted_label }}, Score = {{'%0.2f' % score|float}}, Index = {{index}}, Key = {{key}} </dt>
+                            <dd> <img src="{{ url_for('display_images', job_id=job.experiment.dataset_id, key=key) }}" alt="Image Placeholder" height="100"> </dd>
+                         {% endfor %}
+                    </dl>
+    
+    <script>
+        $('#page-selection-miss').bootpag({
+            total: {{(miss_results|length/10)|round(0,'ceil')|int}},
+            maxVisible: 5,
+            leaps: false,
+        }).on("page", function(event, num){
+         
+            {% for miss_results1 in miss_results|batch(10) %}
+                if({{loop.index}} == num){
+                   $("#miss-list").html(
+                     "{% for predicted_label, score, key, index in miss_results1  %} <dt>" + (10*(num-1)+{{loop.index}}) + ". Predicted Label = {{ predicted_label }}, Score = {{'%0.2f' % score|float}}, Index = {{index}}, Key = {{key}} </dt>\ <dd> <img src='{{ url_for('display_images', job_id=job.experiment.dataset_id, key=key) }}' alt='Image Placeholder' height='100'> </dd>\ {% endfor %}"
+                     );
+                }; 
+            {% endfor %}            
+        });
+    </script>
+        
+               </div>    
+        </div>
+        
+                
+        <div class="col-sm-4">
+            <h3> <b> Successful Examples </b> </h3>
+
+            <div id="page-selection-hit"></div>   
+                <div class="well">                
+                    <dl id="hit-list">
+                        {% for score, key, index in hit_results[:10]  %}
+                            <dt> {{loop.index}}. Score = {{'%0.2f' % score|float}}, Index = {{index}} </dt>
+                            <dd> <img src="{{ url_for('display_images', job_id=job.experiment.dataset_id, key=key) }}" alt="Image Placeholder" height="100"> </dd>
+                         {% endfor %}
+                    </dl>
+    
+    <script>
+        $('#page-selection-hit').bootpag({
+            total: {{(hit_results|length/10)|round(0,'ceil')|int}},
+            maxVisible: 5,
+            leaps: false,
+        }).on("page", function(event, num){
+         
+            {% for hit_results1 in hit_results|batch(10) %}
+                if({{loop.index}} == num){
+                   $("#hit-list").html(
+                     "{% for score, key, index in hit_results1  %} <dt>" + (10*(num-1)+{{loop.index}}) + ". Score = {{'%0.2f' % score|float}}, Index = {{index}} </dt>\ <dd> <img src='{{ url_for('display_images', job_id=job.experiment.dataset_id, key=key) }}' alt='Image Placeholder' height='100'> </dd>\ {% endfor %}"
+                     );
+                }; 
+            {% endfor %}            
+        });
+    </script>
+        
+                </div>    
+        </div>
+        
+    </div>
+
+
+
+
+
+
+
+{% endblock %}
+                                    
+            
+
+

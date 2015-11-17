@@ -1,0 +1,90 @@
+{# Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved. #}
+
+{% from "helper.html" import print_flashes %}
+
+{% extends "layout.html" %}
+
+{% block title %}
+New Image Classification Experiment
+{% endblock %}
+
+{% block nav %}
+<li><a href="{{ url_for('home')}}">Datasets</a></li>
+<li><a href="{{ url_for('home_model', dataset_id=dataset.id())}}">Models</a></li>
+<li class="active"><a href="{{url_for('image_classification_experiment_new', dataset_id=dataset.id(), model_id=model.id())}}">New Experiment</a></li>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1>New Image Classification Experiment</h1>
+</div>
+
+<form id="experiment-form" action="{{url_for('image_classification_experiment_create', dataset_id=dataset.id(), model_id=model.id())}}" enctype="multipart/form-data" method="post">
+    {{ form.hidden_tag() }}
+
+    {% if form.errors %}
+        <div class="alert alert-danger">
+            {% for field, errors in form.errors.items() %}
+                <li>{{ field }}
+                    <ul>
+                        {% for e in errors %}
+                            <li>{{ e }}</li>
+                        {% endfor %}
+                    </ul>
+                </li>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-sm-4">
+            <div class="well">
+                <div id="dataset-summary">
+                        {% if dataset %}
+                        {% include 'datasets/summary.html' %}
+                        {% endif %}
+                </div>
+            </div>
+        </div>
+   
+        <div class="col-sm-4">          
+            <div class="well" id="model">                           
+                <div class="row">
+                    <div class="col-sm-8">                             
+                        <a class="btn btn-info" href="{{ url_for('show_job', job_id=model.id()) }}" target="_blank">Model - {{model.name()}}</a> 
+                    </div>                    
+               
+                    <div class="col-sm-4">                           
+                        {{form.model_snapshots(class='form-control')}}
+                    </div>                                                                         
+                </div>   
+            </br>  
+                <dt> Category used to Train </dt>
+                <dd> {{model.category_label}}</dd>           
+           </br>  
+                <div class="form-group{{' has-error' if form.model_layers.errors}}">
+                    {{form.model_layers.label}}
+                    <span name="model_layers_explanation"
+                        class="explanation-tooltip glyphicon glyphicon-question-sign"
+                        data-container="body"
+                        title="Choose the layers that you would like to extract. Hold CTRL to make multiple selections"
+                        ></span>          
+                    {{form.model_layers(class='form-control', size=10)}}       
+                </div>
+            </div>            
+        </div>
+    
+        <div class="col-sm-4">
+            <div class="well">
+                <input type="submit" name="create-experiment" class="btn btn-primary" value="Create">
+            </div>
+        </div>
+    </div>
+</form>
+
+<script>
+$(".explanation-tooltip").tooltip();
+</script>
+
+{% endblock %}

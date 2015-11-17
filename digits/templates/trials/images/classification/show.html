@@ -1,0 +1,119 @@
+{# Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved. #}
+
+{% extends "job.html" %}
+
+{% block nav %}
+<li><a href="{{ url_for('home')}}">Datasets</a></li>
+<li><a href="{{ url_for('home_model', dataset_id=job.experiment.dataset_id)}}">Models</a></li>
+<li><a href="{{ url_for('experiments_show', job_id=job.experiment_id)}}">Experiments</a></li>
+{{ super() }}
+{% endblock %}
+
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/bokeh.min.css') }}">
+ <script src="{{ url_for('static', filename='js/bokeh.min.js') }}" ></script>
+{% endblock %}
+
+
+{% block job_content %}
+
+<div class="row">
+    <div class="col-sm-6">
+        <div class="well">
+            <dl>
+                <dt> Dataset </dt>
+                <dd> <a class="btn btn-s btn-info" href="{{ url_for('show_job', job_id=job.experiment.dataset.id()) }}" target="_blank"> {{job.experiment.dataset.name()}}</a> </dd>
+                <dt> Model </dt>
+                <dd> <a class="btn btn-s btn-info" href="{{ url_for('show_job', job_id=job.experiment.model.id()) }}" target="_blank"> {{job.experiment.model.name()}}</a> </dd>
+                <dt> Learning Method </dt>
+                <dd> {{job.learning_method}} </dd>
+                <dt> Category </dt>
+                <dd> {{job.category_name}} </dd>
+                {% if job.learning_method != 'dnn'%}
+                <dt> Extracted Layer </dt>
+                <dd> {{job.layer}} </dd>
+                {% endif %}
+                {% if job.learning_method == 'svm'%}
+                <dt> Parameters </dt>
+                <dd> <strong>C</strong>: {{job.tasks[0].C}}, 
+                     <strong>Class Weight</strong>: {{job.tasks[0].class_weight}}, 
+                     <strong>Normalised</strong>: {{job.tasks[0].normalise}}
+                </dd>
+                {% endif %}
+            </dl>
+        </div>
+    </div>
+</div>
+       
+<div class="row">
+    <div class="col-sm-12">
+        <div class="well">
+            <h3 class='text-left'>Results</h3>
+                <div class="conf-mat">
+                    {% set conf_mat_data = job.plot_confusion_matrix(job.confusion_matrix) %}
+                    {% if conf_mat_data %}
+                        {{ conf_mat_data[0]|safe }}
+                        {{ conf_mat_data[1]|safe }}
+                    {% endif %}
+                </div>
+
+                <div class="average-accuracy">
+                    {% set average_accuracy = job.calculate_average_accuracy(job.confusion_matrix) %}
+                    {% if average_accuracy %}
+                        {{ average_accuracy[0]|safe }}
+                        {{ average_accuracy[1]|safe }}
+                    {% endif %}
+                </div>
+
+                <div class="precision-scores">
+                    {% set precision_data = job.plot_scores(job.scores) %}
+                    {% if precision_data %}
+                        {{ precision_data[0]|safe }}
+                        {{ precision_data[1]|safe }}
+                    {% endif %}
+                </div>
+                                    
+        </div>        
+    </div>
+</div>
+
+{% if job.track_confusion_matrix is defined %}
+{% set conf_mat_data = job.plot_confusion_matrix(job.track_confusion_matrix) %}
+{% if conf_mat_data %}
+<div class="row">
+    <div class="col-sm-12">
+        <div class="well">
+            <h3 class='text-left'>Results By Track using Mode</h3>
+          
+                <div class="track_conf-mat">                       
+                        {{ conf_mat_data[0]|safe }}
+                        {{ conf_mat_data[1]|safe }}
+                </div>
+ 
+                <div class="average-accuracy">
+                    {% set average_accuracy = job.calculate_average_accuracy(job.track_confusion_matrix) %}
+                    {% if average_accuracy %}
+                        {{ average_accuracy[0]|safe }}
+                        {{ average_accuracy[1]|safe }}
+                    {% endif %}
+                </div>
+
+                <div class="track_precision-scores">
+                    {% if job.track_scores is defined %}
+                    {% set precision_data = job.plot_scores(job.track_scores) %}
+                    {% if precision_data %}
+                        {{ precision_data[0]|safe }}
+                        {{ precision_data[1]|safe }}
+                    {% endif %}
+                    {% endif %}
+                </div>
+                                    
+        </div>        
+    </div>
+</div>
+{% endif %}
+{% endif %}
+
+{% endblock %}
+

@@ -1,0 +1,139 @@
+{# Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved. #}
+
+{% extends "job.html" %}
+
+{% block nav %}
+<li><a href="{{ url_for('home')}}">Datasets</a></li>
+<li><a href="{{ url_for('home_model', dataset_id=job.dataset_id)}}">Models</a></li>
+{{ super() }}
+{% endblock %}
+
+{% block job_content %}
+
+{% set task = job.extract_task() %}
+
+<script>
+function deleteJob(job_id) {
+    bootbox.confirm(
+            'Are you sure you want to delete this job?<br><br>All related files will be permanently removed.',
+            function(result) {
+                if (result)
+                    $.ajax('/jobs/' + job_id,
+                        {type: "DELETE"})
+                    .done(function() {
+                        window.location.reload(1);
+                        })
+                    .fail(function(data) { errorAlert(data); });
+            });
+    return false;
+}
+</script>
+
+<div class="row">
+    <div class="col-sm-5">
+        <div class="well">
+            {% if job.dataset %}
+            {% with dataset = job.dataset %}
+            {% include 'datasets/summary.html' %}
+            {% endwith %}
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="col-sm-4"> 
+        <div class="well">
+            <a class="btn btn-info" style="white-space:normal; word-break:break-all;" href="{{ url_for('show_job', job_id=job.model_id) }}" target="_blank">Model - {{job.model.name()}}</a>        
+            <dl>
+            </br> 
+                <dt> Category used to Train </dt>
+                <dd> {{job.model.category_label}} </dd>
+
+                <dt>Batch Deploy (train)</dt>                  
+                <dd><a href="{{url_for('serve_file', path=job.tasks[0].path(task.batch_deploy_file, relative=True))}}">{{job.tasks[0].batch_deploy_file[-27:]}}</a></dd>
+                <dt>Batch Deploy (val)</dt>                  
+                <dd><a href="{{url_for('serve_file', path=job.tasks[1].path(job.tasks[1].batch_deploy_file, relative=True))}}">{{job.tasks[1].batch_deploy_file[-25:]}}</a></dd>
+                <dt>Batch Deploy (test)</dt>                  
+                <dd><a href="{{url_for('serve_file', path=job.tasks[2].path(job.tasks[2].batch_deploy_file, relative=True))}}">{{job.tasks[2].batch_deploy_file[-26:]}}</a></dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="col-sm-3"> 
+        <div class="well">
+            <h4> Experiment </h4>       
+            <dl>
+                <dt>Job Directory</dt>
+                <dd>{{ job.dir() }}</dd>
+                <dt> Extracted Layers </dt>
+                <dd> {{', '.join(job.layers)}} </dd>
+            </dl>
+            <a class="btn btn-warning" style="white-space:normal;" href="{{ url_for('image_classification_experiment_add_layers', experiment_id=job.id()) }}">Extract More Layers</a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-sm-12">
+        <div class="well">
+
+            <h2 style="display:inline;"> Trials </h2>
+            <a class="btn btn-primary pull-right" href="{{ url_for('image_classification_trial_new', experiment_id=job.id()) }}">New Trial</a>
+<br>
+
+
+<h3>In progress</h3>
+<ul id="trials-running" class="list-group">
+    {% for job in running_trials[0] %}
+    <li class="list-group-item">
+        <a class="btn btn-xs btn-danger pull-right" onClick="return deleteJob('{{job.id()}}');">Delete</a>
+        <h4 class="list-group-item-heading"><a href="{{ url_for('show_job', job_id=job.id()) }}">{{ job.name() }}</a></h4>
+        <p class="list-group-item-text">
+        <b>Submitted:</b> {{job.status_history[0][1]|print_time}}
+        <small>({{job.status_history[0][1]|print_time_since}} ago)</small>
+        <br />
+        <b>Status:</b> <span class="text-{{job.status.css}}">{{job.status.name}}</span>
+    </li>
+    {% else %}
+    <li class="list-group-item"><i>None</i></li>
+    {% endfor %}
+</ul>
+
+<h3>Completed</h3>
+<div class="tab-content">
+    {% for batch in completed_trials[0]|batch(10) %}
+    <div class="tab-pane{{' active' if loop.index==1}}" id="completed-trials-page-{{loop.index}}">
+        <ul class="list-group">
+            {% for job in batch %}
+            <li class="list-group-item">
+            <a class="btn btn-xs btn-danger pull-right" onClick="return deleteJob('{{job.id()}}');">Delete</a>
+                <h4 class="list-group-item-heading"><a href="{{ url_for('show_job', job_id=job.id()) }}">{{ job.name() }}</a></h4>
+                <p class="list-group-item-text">
+                <b>Submitted:</b> {{job.status_history[0][1]|print_time}}
+                <br />
+                <b>Status:</b> <span class="text-{{job.status.css}}">{{job.status.name}}</span>
+                <small>after {{(job.status_history[-1][1]-job.status_history[0][1])|print_time_diff}}</small>
+            </li>
+            {% else %}
+            <li class="list-group-item"><i>None</i></li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endfor %}
+</div>
+{% if completed_trials|length > 10 %}
+<div class="text-center">
+    <ul class="pagination">
+        {% for i in range((completed_trials|length/10)|round(0,'ceil')|int) %}
+        <li class="{{'active' if i==0}}"><a href="#completed-trials-page-{{i+1}}" data-toggle="tab">{{i+1}}</a></li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
