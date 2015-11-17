@@ -13,3 +13,4 @@
 # Ignore these directories
 /venv/
 /digits/jobs/
+/.idea/
