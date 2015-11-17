@@ -1,9 +1,21 @@
         <li id="job-{{job.id()}}" class="list-group-item">
-        <a class="btn btn-xs btn-danger pull-right" onClick="return deleteJob('{{job.id()}}');">Delete</a>
-            <h4 class="list-group-item-heading"><a href="{{ url_for(show_func, job_id=job.id()) }}">{{ job.name() }}</a> &nbsp; <span class="badge">{{badge}}</span></h4>
-            <p class="list-group-item-text">
-            <b>Submitted:</b> {{job.status_history[0][1]|print_time}}
-            <br />
-            <b>Status:</b> <span class="text-{{job.status.css}}">{{job.status.name}}</span>
-            <small>after {{(job.status_history[-1][1]-job.status_history[0][1])|print_time_diff}}</small>
+            <div class="row">
+                <div class="col-sm-6">
+                    <a class="btn btn-xs btn-danger pull-right" onClick="return deleteJob('{{job.id()}}');">Delete</a>
+                    <h4 class="list-group-item-heading"><a href="{{ url_for(show_func, job_id=job.id()) }}">{{ job.name() }}</a> &nbsp; <span class="badge">{{badge}}</span></h4>
+                    <p class="list-group-item-text">
+                    <b>Submitted:</b> {{job.status_history[0][1]|print_time}}
+                    <br />
+                    <b>Status:</b> <span class="text-{{job.status.css}}">{{job.status.name}}</span>
+                    <small>after {{(job.status_history[-1][1]-job.status_history[0][1])|print_time_diff}}</small>
+                </div>
+
+                <div class="col-sm-6">
+                    {% if name == 'Dataset' %}
+                        <a class="btn btn-lg btn-success pull-right" href="{{ url_for('home', dataset_id=job.id())}}">Models</a>
+                    {% elif name == 'Model' %}
+                        <a class="btn btn-lg btn-success pull-right" href="{{ url_for('home_experiment', dataset_id=dataset_id, model_id=job.id())}}">Experiments</a>
+                    {% endif %}
+                </div>
+            </div>
         </li>

@@ -11,7 +11,9 @@ New Image Classification Model
 {% endblock %}
 
 {% block nav %}
-<li class="active"><a href="{{url_for('image_classification_model_new')}}">New Model</a></li>
+<li><a href="{{ url_for('home')}}">Datasets</a></li>
+<li><a href="{{ url_for('home', dataset_id=dataset_id)}}">Models</a></li>
+<li class="active"><a href="{{url_for('image_classification_model_new', dataset_id=dataset_id)}}">New Model</a></li>
 {% endblock %}
 
 {% block content %}
@@ -19,18 +21,20 @@ New Image Classification Model
     <h1>New Image Classification Model</h1>
 </div>
 
-<form id="model-form" action="{{url_for('image_classification_model_create')}}" enctype="multipart/form-data" method="post">
+<form id="model-form" action="{{url_for('image_classification_model_create', dataset_id=dataset_id)}}" enctype="multipart/form-data" method="post">
     {{ form.hidden_tag() }}
 
     {{ print_errors(form) }}
 
     <div class="row">
         <div class="col-sm-4">
+
             <div class="well">
-                <div class="form-group{{mark_errors([form.dataset])}}">
-                    {{form.dataset.label}}
-                    {{form.dataset.tooltip}}
-                    {{form.dataset(class='form-control', size=5)}}
+                <div class="form-group{{mark_errors([form.category_names])}}">
+                    {{form.category_names.label}}
+                    {{form.category_names.tooltip}}
+                    <a class="btn btn-xs btn-info" href="{{ url_for('show_job', job_id=dataset_id) }}">Dataset - {{dataset_name}}</a>
+                    {{form.category_names(class='form-control', size=5)}}
                 </div>
             </div>
 

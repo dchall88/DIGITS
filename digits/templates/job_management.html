@@ -203,8 +203,6 @@
 
 {% block content %}
 
-{% set running_jobs = running_datasets + running_models %}
-
 {# if there are running_jobs, show this table #}
 <div id="job_table_parent" class="row"{{' style=display:none;' if running_jobs|length == 0}}>
     <table id="job_table" class="table">

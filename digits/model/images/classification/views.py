@@ -26,14 +26,14 @@ from digits.utils import filesystem as fs
 
 NAMESPACE   = '/models/images/classification'
 
-@app.route(NAMESPACE + '/new', methods=['GET'])
+@app.route(NAMESPACE + '/<dataset_id>/new', methods=['GET'])
 @autodoc('models')
-def image_classification_model_new():
+def image_classification_model_new(dataset_id):
     """
     Return a form for a new ImageClassificationModelJob
     """
     form = ImageClassificationModelForm()
-    form.dataset.choices = get_datasets()
+    dataset_name, form.category_names.choices = get_category_names(dataset_id)
     form.standard_networks.choices = get_standard_networks()
     form.standard_networks.default = get_default_standard_network()
     form.previous_networks.choices = get_previous_networks()
@@ -45,6 +45,8 @@ def image_classification_model_new():
 
     return flask.render_template('models/images/classification/new.html',
             form = form,
+            dataset_name=dataset_name,
+            dataset_id=dataset_id,
             frameworks = frameworks.get_frameworks(),
             previous_network_snapshots = prev_network_snapshots,
             previous_networks_fullinfo = get_previous_networks_fulldetails(),
@@ -52,16 +54,16 @@ def image_classification_model_new():
             )
 
 @app.route(NAMESPACE + '.json', methods=['POST'])
-@app.route(NAMESPACE, methods=['POST'])
+@app.route(NAMESPACE + '/<dataset_id>/', methods=['POST'])
 @autodoc(['models', 'api'])
-def image_classification_model_create():
+def image_classification_model_create(dataset_id):
     """
     Create a new ImageClassificationModelJob
 
     Returns JSON when requested: {job_id,name,status} or {errors:[]}
     """
     form = ImageClassificationModelForm()
-    form.dataset.choices = get_datasets()
+    dataset_name, form.category_names.choices = get_category_names(dataset_id)
     form.standard_networks.choices = get_standard_networks()
     form.standard_networks.default = get_default_standard_network()
     form.previous_networks.choices = get_previous_networks()
@@ -77,22 +79,20 @@ def image_classification_model_create():
         else:
             return flask.render_template('models/images/classification/new.html',
                     form = form,
+                    dataset_name=dataset_name,
+                    dataset_id=dataset_id,
                     frameworks = frameworks.get_frameworks(),
                     previous_network_snapshots = prev_network_snapshots,
                     previous_networks_fullinfo = get_previous_networks_fulldetails(),
                     multi_gpu = config_value('caffe_root')['multi_gpu'],
                     ), 400
 
-    datasetJob = scheduler.get_job(form.dataset.data)
-    if not datasetJob:
-        raise werkzeug.exceptions.BadRequest(
-                'Unknown dataset job_id "%s"' % form.dataset.data)
-
     job = None
     try:
         job = ImageClassificationModelJob(
                 name        = form.model_name.data,
-                dataset_id  = datasetJob.id(),
+                dataset_id  = dataset_id,
+                category_label = form.category_names.choices[form.category_names.data][1],
                 )
         # get handle to framework object
         fw = frameworks.get_framework_by_id(form.framework.data)
@@ -198,7 +198,7 @@ def image_classification_model_create():
 
         job.tasks.append(fw.create_train_task(
                     job_dir         = job.dir(),
-                    dataset         = datasetJob,
+                    dataset         = job.dataset,
                     train_epochs    = form.train_epochs.data,
                     snapshot_interval   = form.snapshot_interval.data,
                     learning_rate   = form.learning_rate.data,
@@ -214,6 +214,7 @@ def image_classification_model_create():
                     random_seed     = form.random_seed.data,
                     solver_type     = form.solver_type.data,
                     shuffle         = form.shuffle.data,
+                    category_index  = form.category_names.data,
                     )
                 )
 
@@ -473,12 +474,14 @@ def image_classification_model_top_n():
             results=results,
             )
 
-def get_datasets():
-    return [(j.id(), j.name()) for j in sorted(
-        [j for j in scheduler.jobs if isinstance(j, ImageClassificationDatasetJob) and (j.status.is_running() or j.status == Status.DONE)],
-        cmp=lambda x,y: cmp(y.id(), x.id())
-        )
-        ]
+def get_category_names(dataset_id):
+    for j in scheduler.jobs:
+        if isinstance(j, ImageClassificationDatasetJob) and (j.id() == dataset_id):
+            j.load_labels()
+            category_names = [(category_index, '%s' % category) for category_index, category in enumerate(j.labels.keys())]
+            return j.name(), category_names
+
+    return 'none', [(-1, 'None')]
 
 def get_standard_networks():
     return [

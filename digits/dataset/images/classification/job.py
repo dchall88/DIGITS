@@ -1,9 +1,12 @@
 # Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
 
+import os.path
+from collections import OrderedDict
 from digits.utils import subclass, override
 from digits.status import Status
 from ..job import ImageDatasetJob
 from digits.dataset import tasks
+
 
 # NOTE: Increment this everytime the pickled object changes
 PICKLE_VERSION = 2
@@ -17,7 +20,7 @@ class ImageClassificationDatasetJob(ImageDatasetJob):
     def __init__(self, **kwargs):
         super(ImageClassificationDatasetJob, self).__init__(**kwargs)
         self.pickver_job_dataset_image_classification = PICKLE_VERSION
-
+        self.labels = None
         self.labels_file = None
 
     def __setstate__(self, state):
@@ -69,4 +72,17 @@ class ImageClassificationDatasetJob(ImageDatasetJob):
             if isinstance(t, tasks.CreateDbTask) and 'train' in t.name().lower():
                 return t
         return None
+
+    def load_labels(self):
+
+        if not os.path.exists(self.path(self.labels_file)):
+            self.labels = None
+        else:
+            self.labels = OrderedDict()
+            with open(self.path(self.labels_file), 'r') as infile:
+                for line in infile:
+                    line = line.strip()
+                    line = line.split(' ')
+                    if line:
+                        self.labels[line[0]] = line[1:]
 

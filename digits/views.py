@@ -43,7 +43,7 @@ def home(dataset_id=None):
         job_type = dataset.DatasetJob
     # Model Job
     else:
-        job_type = dataset.ModelJob
+        job_type = model.ModelJob
 
     running_jobs = get_job_list(job_type, True, dataset_id)
     completed_jobs = get_job_list(job_type, False, dataset_id)
@@ -70,17 +70,17 @@ def home(dataset_id=None):
                         {
                             'title': 'Images',
                             'id': 'images',
-                            'url': flask.url_for('image_dataset_new'),
+                            'url': flask.url_for('image_classification_dataset_new'),
                             },
-                         {
-                            'title': 'Bounding Boxes',
-                            'id': 'bboxes',
-                            'url': flask.url_for('bounding_box_dataset_new'),
-                            },
+                        # {
+                        #     'title': 'Bounding Boxes',
+                        #     'id': 'bboxes',
+                        #     'url': flask.url_for('bounding_box_dataset_new'),
+                        #     },
                         {
                             'title': 'Generic',
                             'id': 'generic',
-                            'url': flask.url_for('generic_dataset_new'),
+                            'url': flask.url_for('generic_image_dataset_new'),
                             },
                         ])
                     ]
@@ -92,12 +92,12 @@ def home(dataset_id=None):
                         {
                             'title': 'Classification',
                             'id': 'classification',
-                            'url': flask.url_for('classification_model_new'),
+                            'url': flask.url_for('image_classification_model_new', dataset_id=dataset_id),
                             },
                         {
                             'title': 'Generic',
                             'id': 'generic-classification',
-                            'url': flask.url_for('generic_model_new'),
+                            'url': flask.url_for('generic_image_model_new', dataset_id=dataset_id),
                             },
                         ])
                     ]
@@ -108,8 +108,8 @@ def home(dataset_id=None):
             dataset_name=dataset_name,
             dataset_id=dataset_id,
             options=options,
-            running=running_jobs,
-            completed=completed_jobs,
+            running_jobs=running_jobs,
+            completed_jobs=completed_jobs,
             total_gpu_count=len(scheduler.resources['gpus']),
             remaining_gpu_count=sum(r.remaining() for r in scheduler.resources['gpus']),
             )

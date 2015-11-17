@@ -307,8 +307,9 @@ def parse_folder(folder, labels_file,
         with open(labels_file) as infile:
             for line in infile:
                 line = line.strip()
+                line = line.split(' ')
                 if line:
-                    labels.append(line)
+                    labels = line[1:]
 
     ### Verify that at least two category folders exist
 
@@ -346,6 +347,17 @@ def parse_folder(folder, labels_file,
         val_outfile = open(val_file, 'w')
     if percent_test:
         test_outfile = open(test_file, 'w')
+
+    #Use directory name as category label
+    category_type = folder
+    if folder_is_url:
+        category_type = unescape(category_type)
+    else:
+        category_type = os.path.basename(category_type)
+        category_type = category_type.replace(' ','_')
+    if category_type.endswith('/'):
+        # Remove trailing slash
+        category_type = category_type[0:-1]
 
     subdir_index = 0
     label_index = 0
@@ -446,7 +458,7 @@ def parse_folder(folder, labels_file,
             return False
         else:
             with open(labels_file, 'w') as labels_outfile:
-                labels_outfile.write('\n'.join(labels) + '\n')
+                labels_outfile.write(category_type + ' ' + ' '.join(labels) + '\n')
 
     logger.info('Found %d images in %d categories.' % (train_count + val_count + test_count, len(labels)))
     logger.info('Selected %d for training.' % train_count)

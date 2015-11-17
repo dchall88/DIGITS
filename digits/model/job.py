@@ -13,7 +13,7 @@ class ModelJob(Job):
     A Job that creates a neural network model
     """
 
-    def __init__(self, dataset_id, **kwargs):
+    def __init__(self, dataset_id, category_label, **kwargs):
         """
         Arguments:
         dataset_id -- the job_id of the DatasetJob that this ModelJob depends on
@@ -23,6 +23,8 @@ class ModelJob(Job):
 
         self.dataset_id = dataset_id
         self.load_dataset()
+
+        self.category_label = category_label
 
     def __getstate__(self):
         state = super(ModelJob, self).__getstate__()
