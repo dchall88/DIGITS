@@ -10,7 +10,7 @@ New Image Classification Trial
 
 {% block nav %}
 <li><a href="{{ url_for('home')}}">Datasets</a></li>
-<li><a href="{{ url_for('home_model', dataset_id=experiment.dataset_id)}}">Models</a></li>
+<li><a href="{{ url_for('home', dataset_id=experiment.dataset_id)}}">Models</a></li>
 <li><a href="{{ url_for('experiments_show', job_id=experiment.id())}}">Experiments</a></li>
 <li class="active"><a href="{{url_for('image_classification_trial_new', experiment_id=experiment.id())}}">New Trial</a></li>
 {% endblock %}

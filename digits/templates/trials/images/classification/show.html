@@ -4,7 +4,7 @@
 
 {% block nav %}
 <li><a href="{{ url_for('home')}}">Datasets</a></li>
-<li><a href="{{ url_for('home_model', dataset_id=job.experiment.dataset_id)}}">Models</a></li>
+<li><a href="{{ url_for('home', dataset_id=job.experiment.dataset_id)}}">Models</a></li>
 <li><a href="{{ url_for('experiments_show', job_id=job.experiment_id)}}">Experiments</a></li>
 {{ super() }}
 {% endblock %}

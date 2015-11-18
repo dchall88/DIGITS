@@ -10,7 +10,7 @@ New Image Classification Experiment
 
 {% block nav %}
 <li><a href="{{ url_for('home')}}">Datasets</a></li>
-<li><a href="{{ url_for('home_model', dataset_id=dataset.id())}}">Models</a></li>
+<li><a href="{{ url_for('home', dataset_id=dataset.id())}}">Models</a></li>
 <li><a href="{{ url_for('home_experiment', dataset_id=dataset.id(), model_id=model.id())}}">Experiments</a></li>
 <li class="active"><a href="{{url_for('image_classification_experiment_new', dataset_id=dataset.id(), model_id=model.id())}}">New Experiment</a></li>
 {% endblock %}
@@ -43,7 +43,7 @@ New Image Classification Experiment
             <div class="well">
                 <div id="dataset-summary">
                         {% if dataset %}
-                        {% include 'datasets/summary.html' %}
+                        {% include 'datasets/images/classification/summary.html' %}
                         {% endif %}
                 </div>
             </div>
