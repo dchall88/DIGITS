@@ -27,6 +27,9 @@ CAFFE_SOLVER_FILE = 'solver.prototxt'
 CAFFE_TRAIN_VAL_FILE = 'train_val.prototxt'
 CAFFE_SNAPSHOT_PREFIX = 'snapshot'
 CAFFE_DEPLOY_FILE = 'deploy.prototxt'
+CAFFE_BATCH_DEPLOY_TRAIN_FILE = 'batch_deploy_train.prototxt'
+CAFFE_BATCH_DEPLOY_VAL_FILE = 'batch_deploy_val.prototxt'
+CAFFE_BATCH_DEPLOY_TEST_FILE = 'batch_deploy_test.prototxt'
 
 @subclass
 class CaffeTrainTask(TrainTask):
@@ -41,13 +44,18 @@ class CaffeTrainTask(TrainTask):
         #TODO
         pass
 
-    def __init__(self, **kwargs):
+    def __init__(self, category_index, **kwargs):
         """
         Arguments:
         network -- a caffe NetParameter defining the network
         """
         super(CaffeTrainTask, self).__init__(**kwargs)
         self.pickver_task_caffe_train = PICKLE_VERSION
+
+        self.layers = self.get_layers()
+        self.category_index = category_index
+        self.labels = self.dataset.get_labels()
+        self.category_name = self.labels.keys()[self.category_index]
 
         self.current_iteration = 0
 
@@ -60,6 +68,9 @@ class CaffeTrainTask(TrainTask):
         self.train_val_file = CAFFE_TRAIN_VAL_FILE
         self.snapshot_prefix = CAFFE_SNAPSHOT_PREFIX
         self.deploy_file = CAFFE_DEPLOY_FILE
+        self.batch_deploy_test_file = CAFFE_BATCH_DEPLOY_TEST_FILE
+        self.batch_deploy_train_file = CAFFE_BATCH_DEPLOY_TRAIN_FILE
+        self.batch_deploy_val_file = CAFFE_BATCH_DEPLOY_VAL_FILE
         self.log_file = self.CAFFE_LOG
 
     def __getstate__(self):
@@ -213,11 +224,14 @@ class CaffeTrainTask(TrainTask):
         Save solver, train_val and deploy files to disk
         """
         has_val_set = self.dataset.val_db_task() is not None
+        has_test_set = self.dataset.test_db_task() is not None
 
         ### Check what has been specified in self.network
 
         tops = []
         bottoms = {}
+        train_label_layer = None
+        val_label_layer = None
         train_data_layer = None
         val_data_layer = None
         hidden_layers = caffe_pb2.NetParameter()
@@ -228,18 +242,30 @@ class CaffeTrainTask(TrainTask):
             if layer.type in ['Data', 'HDF5Data']:
                 for rule in layer.include:
                     if rule.phase == caffe_pb2.TRAIN:
-                        assert train_data_layer is None, 'cannot specify two train data layers'
-                        train_data_layer = layer
+                        if 'data' in layer.top:
+                            assert train_data_layer is None, 'cannot specify two train data layers'
+                            train_data_layer = layer
+                        elif 'label' in layer.top:
+                            assert train_label_layer is None, 'cannot specify two train label layers'
+                            train_label_layer = layer
+                        else:
+                            self.logger.error('neither the data nor label layers are specified for training')
                     elif rule.phase == caffe_pb2.TEST:
-                        assert val_data_layer is None, 'cannot specify two test data layers'
-                        val_data_layer = layer
+                        if 'data' in layer.top:
+                            assert val_data_layer is None, 'cannot specify two val data layers'
+                            val_data_layer = layer
+                        elif 'label' in layer.top:
+                            assert val_label_layer is None, 'cannot specify two val label layers'
+                            val_label_layer = layer
+                        else:
+                            self.logger.error('neither the data nor label layers are specified for validation')
             elif layer.type == 'SoftmaxWithLoss':
                 loss_layers.append(layer)
             elif layer.type == 'Accuracy':
                 addThis = True
                 if layer.accuracy_param.HasField('top_k'):
-                    if layer.accuracy_param.top_k >= len(self.get_labels()):
-                        self.logger.warning('Removing layer %s because top_k=%s while there are are only %s labels in this dataset' % (layer.name, layer.accuracy_param.top_k, len(self.get_labels())))
+                    if layer.accuracy_param.top_k >= len(self.labels[self.category_name]):
+                        self.logger.warning('Removing layer %s because top_k=%s while there are are only %s labels in this dataset' % (layer.name, layer.accuracy_param.top_k, len(self.labels[self.category_name])))
                         addThis = False
                 if addThis:
                     accuracy_layers.append(layer)
@@ -269,7 +295,7 @@ class CaffeTrainTask(TrainTask):
             if layer.type == 'InnerProduct':
                 for top in layer.top:
                     if top in network_outputs:
-                        layer.inner_product_param.num_output = len(self.get_labels())
+                        layer.inner_product_param.num_output = len(self.labels[self.category_name])
                         break
 
         ### Write train_val file
@@ -303,6 +329,8 @@ class CaffeTrainTask(TrainTask):
                 self.crop_size = cs
             train_val_network.layer.add().CopyFrom(train_data_layer)
             train_data_layer = train_val_network.layer[-1]
+            train_val_network.layer.add().CopyFrom(train_label_layer)
+            train_label_layer = train_val_network.layer[-1]
             if val_data_layer is not None and has_val_set:
                 if dataset_backend == 'lmdb':
                     assert val_data_layer.type == 'Data', 'expecting a Data layer'
@@ -318,14 +346,15 @@ class CaffeTrainTask(TrainTask):
                     val_data_layer.transform_param.crop_size = self.crop_size
                 train_val_network.layer.add().CopyFrom(val_data_layer)
                 val_data_layer = train_val_network.layer[-1]
+                train_val_network.layer.add().CopyFrom(val_label_layer)
+                val_label_layer = train_val_network.layer[-1]
         else:
             layer_type = 'Data'
             if dataset_backend == 'hdf5':
                 layer_type = 'HDF5Data'
-            train_data_layer = train_val_network.layer.add(type = layer_type, name = 'data')
+            train_data_layer = train_val_network.layer.add(type=layer_type, name='data')
             train_data_layer.top.append('data')
-            train_data_layer.top.append('label')
-            train_data_layer.include.add(phase = caffe_pb2.TRAIN)
+            train_data_layer.include.add(phase=caffe_pb2.TRAIN)
             if dataset_backend == 'lmdb':
                 train_data_layer.data_param.batch_size = constants.DEFAULT_BATCH_SIZE
             elif dataset_backend == 'hdf5':
@@ -333,17 +362,25 @@ class CaffeTrainTask(TrainTask):
             if self.crop_size:
                 assert dataset_backend != 'hdf5', 'HDF5Data layer does not support cropping'
                 train_data_layer.transform_param.crop_size = self.crop_size
+            # Add separate layer for labels (allows support for multiple labels for a given image)
+            train_label_layer = train_val_network.layer.add(type='HDF5Data', name='label')
+            train_label_layer.top.append('label')
+            train_label_layer.include.add(phase=caffe_pb2.TRAIN)
+            train_label_layer.hdf5_data_param.batch_size = constants.DEFAULT_BATCH_SIZE
             if has_val_set:
-                val_data_layer = train_val_network.layer.add(type = layer_type, name = 'data')
+                val_data_layer = train_val_network.layer.add(type=layer_type, name='data')
                 val_data_layer.top.append('data')
-                val_data_layer.top.append('label')
-                val_data_layer.include.add(phase = caffe_pb2.TEST)
+                val_data_layer.include.add(phase=caffe_pb2.TEST)
                 if dataset_backend == 'lmdb':
                     val_data_layer.data_param.batch_size = constants.DEFAULT_BATCH_SIZE
                 elif dataset_backend == 'hdf5':
                     val_data_layer.hdf5_data_param.batch_size = constants.DEFAULT_BATCH_SIZE
                 if self.crop_size:
                     val_data_layer.transform_param.crop_size = self.crop_size
+                val_label_layer = train_val_network.layer.add(type='HDF5Data', name='label')
+                val_label_layer.top.append('label')
+                val_label_layer.include.add(phase = caffe_pb2.TEST)
+                val_label_layer.hdf5_data_param.batch_size = constants.DEFAULT_BATCH_SIZE
         if dataset_backend == 'lmdb':
             train_data_layer.data_param.source = self.dataset.path(self.dataset.train_db_task().db_name)
             train_data_layer.data_param.backend = caffe_pb2.DataParameter.LMDB
@@ -354,6 +391,10 @@ class CaffeTrainTask(TrainTask):
             train_data_layer.hdf5_data_param.source = self.dataset.path(self.dataset.train_db_task().textfile)
             if val_data_layer is not None and has_val_set:
                 val_data_layer.hdf5_data_param.source = self.dataset.path(self.dataset.val_db_task().textfile)
+
+        train_label_layer.hdf5_data_param.source = self.dataset.path('train_label_' + str(self.category_index) + '.txt')
+        if val_data_layer is not None and has_val_set:
+            val_label_layer.hdf5_data_param.source = self.dataset.path('val_label_' + str(self.category_index) + '.txt')
 
         if self.use_mean == 'pixel':
             assert dataset_backend != 'hdf5', 'HDF5Data layer does not support mean subtraction'
@@ -376,6 +417,9 @@ class CaffeTrainTask(TrainTask):
                 train_data_layer.hdf5_data_param.batch_size = self.batch_size
                 if val_data_layer is not None and has_val_set:
                     val_data_layer.hdf5_data_param.batch_size = self.batch_size
+            train_label_layer.hdf5_data_param.batch_size = self.batch_size
+            if val_data_layer is not None and has_val_set:
+                val_label_layer.hdf5_data_param.batch_size = self.batch_size
         else:
             if dataset_backend == 'lmdb':
                 if not train_data_layer.data_param.HasField('batch_size'):
@@ -427,6 +471,9 @@ class CaffeTrainTask(TrainTask):
 
         with open(self.path(self.deploy_file), 'w') as outfile:
             text_format.PrintMessage(deploy_network, outfile)
+
+        ### Write batch deploy file
+        self.create_batch_deploy_file(train_data_layer, val_data_layer, hidden_layers, network_outputs, has_val_set, has_test_set)
 
         ### Write solver file
 
@@ -1038,7 +1085,8 @@ class CaffeTrainTask(TrainTask):
         snapshot_epoch -- which snapshot to use
         layers -- which layer activation[s] and weight[s] to visualize
         """
-        labels = self.get_labels()
+
+        labels = self.labels[self.category_name]
         net = self.get_net(snapshot_epoch)
 
         # process image
@@ -1239,7 +1287,7 @@ class CaffeTrainTask(TrainTask):
         Keyword arguments:
         snapshot_epoch -- which snapshot to use
         """
-        labels = self.get_labels()
+        labels = self.labels[self.category_name]
         net = self.get_net(snapshot_epoch)
 
         caffe_images = []
@@ -1456,3 +1504,78 @@ class CaffeTrainTask(TrainTask):
         return text description of model
         """
         return text_format.MessageToString(self.network)
+
+    def get_layers(self):
+        layers = [x.top[0] for x in self.network.layer]
+        layers = [ii for n,ii in enumerate(layers) if ii not in layers[:n]]
+
+        for s in ['data', 'label', 'accuracy', 'loss']:
+            if layers.count(s) == 1:
+                layers.remove(s)
+        layers.append(u'prob')
+        return layers
+
+    def create_batch_deploy_file(self, train_data_layer, val_data_layer, hidden_layers, network_outputs, has_val_set, has_test_set):
+        ### Write batch_deploy file
+
+        batch_deploy_network = caffe_pb2.NetParameter()
+
+        # input
+        batch_deploy_data_layer = batch_deploy_network.layer.add(type='Data', name='data')
+        batch_deploy_data_layer.top.append('data')
+        batch_deploy_data_layer.include.add(phase=caffe_pb2.TEST)
+        batch_deploy_data_layer.data_param.backend = caffe_pb2.DataParameter.LMDB
+
+        batch_deploy_label_layer = batch_deploy_network.layer.add(type='HDF5Data', name='label')
+        batch_deploy_label_layer.top.append('label')
+        batch_deploy_label_layer.include.add(phase=caffe_pb2.TEST)
+
+        max_crop_size = min(self.dataset.image_dims[0], self.dataset.image_dims[1])
+        if self.crop_size:
+            assert self.crop_size <= max_crop_size, 'crop_size is larger than the image size'
+            if self.crop_size:
+                batch_deploy_data_layer.transform_param.crop_size = self.crop_size
+
+        if self.use_mean:
+            batch_deploy_data_layer.transform_param.mean_file = self.dataset.path(self.dataset.train_db_task().mean_file)
+
+        if train_data_layer.transform_param.HasField('scale'):
+            batch_deploy_data_layer.transform_param.scale = train_data_layer.transform_param.scale
+
+        if self.batch_size:
+            batch_deploy_data_layer.data_param.batch_size = self.batch_size
+            batch_deploy_label_layer.hdf5_data_param.batch_size = self.batch_size
+        elif val_data_layer is not None and val_data_layer.data_param.HasField('batch_size'):
+            batch_deploy_data_layer.data_param.batch_size = val_data_layer.data_param.batch_size
+            batch_deploy_label_layer.hdf5_data_param.batch_size = val_data_layer.data_param.batch_size
+        else:
+            batch_deploy_data_layer.data_param.batch_size = constants.DEFAULT_BATCH_SIZE
+            batch_deploy_label_layer.hdf5_data_param.batch_size = constants.DEFAULT_BATCH_SIZE
+
+        # hidden layers
+        batch_deploy_network.MergeFrom(hidden_layers)
+
+        # output layers
+        batch_deploy_layer = batch_deploy_network.layer.add(type='Softmax', name='prob')
+        batch_deploy_layer.bottom.append(network_outputs[-1])
+        batch_deploy_layer.top.append('prob')
+
+        # write batch_deploy_train to file
+        batch_deploy_data_layer.data_param.source = self.dataset.path(self.dataset.train_db_task().db_name)
+        batch_deploy_label_layer.hdf5_data_param.source = self.dataset.path('train_label_' + str(self.category_index) + '.txt')
+        with open(self.path(self.batch_deploy_train_file), 'w') as outfile:
+            text_format.PrintMessage(batch_deploy_network, outfile)
+
+        # write batch_deploy_val to file
+        if has_val_set:
+            batch_deploy_data_layer.data_param.source = self.dataset.path(self.dataset.val_db_task().db_name)
+            batch_deploy_label_layer.hdf5_data_param.source = self.dataset.path('val_label_' + str(self.category_index) + '.txt')
+            with open(self.path(self.batch_deploy_val_file), 'w') as outfile:
+                text_format.PrintMessage(batch_deploy_network, outfile)
+
+        # write batch_deploy_test to file
+        if has_test_set:
+            batch_deploy_data_layer.data_param.source = self.dataset.path(self.dataset.test_db_task().db_name)
+            batch_deploy_label_layer.hdf5_data_param.source = self.dataset.path('test_label_' + str(self.category_index) + '.txt')
+            with open(self.path(self.batch_deploy_test_file), 'w') as outfile:
+                text_format.PrintMessage(batch_deploy_network, outfile)

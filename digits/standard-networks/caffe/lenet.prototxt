@@ -3,7 +3,6 @@ layer {
   name: "mnist"
   type: "Data"
   top: "data"
-  top: "label"
   include {
     phase: TRAIN
   }
@@ -12,14 +11,35 @@ layer {
   }
 }
 layer {
+  name: "mnist-label"
+  type: "HDF5Data"
+  top: "label"
+  include {
+    phase: TRAIN
+  }
+  hdf5_data_param {
+    batch_size: 64
+  }
+}
+layer {
   name: "mnist"
   type: "Data"
   top: "data"
-  top: "label"
   include {
     phase: TEST
   }
   data_param {
+    batch_size: 100
+  }
+}
+layer {
+  name: "mnist-label"
+  type: "HDF5Data"
+  top: "label"
+  include {
+    phase: TEST
+  }
+  hdf5_data_param {
     batch_size: 100
   }
 }

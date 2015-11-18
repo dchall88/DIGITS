@@ -74,11 +74,16 @@ function deleteJob(job_id) {
 
 <div class="tab-content">
     {% for batch in completed_jobs|batch(10) %}
-    <div class="tab-pane{{' active' if loop.index==1}}" id="completed-datasets-page-{{loop.index}}">
-        <ul class="list-group" id="datasets">
+    <div class="tab-pane{{' active' if loop.index==1}}" id="completed-page-{{loop.index}}">
+        <ul class="list-group" id="jobs">
             {% for job in batch %}
-            {% set show_func = 'datasets_show' %}
-            {% set badge = job.train_db_task().backend %}
+                 {% if name == 'Dataset' %}
+                    {% set show_func = 'datasets_show' %}
+                    {% set badge = job.train_db_task().backend %}
+                 {% elif name == 'Model' %}
+                    {% set show_func = 'models_show' %}
+                    {% set badge = job.train_task().get_framework_id() %}
+                 {%  endif %}
             {% include 'job_item.html' %}
             {% else %}
             <li class="list-group-item"><i>None</i></li>
@@ -91,7 +96,7 @@ function deleteJob(job_id) {
 <div class="text-center">
     <ul class="pagination">
         {% for i in range((completed_jobs|length/10)|round(0,'ceil')|int) %}
-        <li class="{{'active' if i==0}}"><a href="#completed-datasets-page-{{i+1}}" data-toggle="tab">{{i+1}}</a></li>
+        <li class="{{'active' if i==0}}"><a href="#completed-page-{{i+1}}" data-toggle="tab">{{i+1}}</a></li>
         {% endfor %}
     </ul>
 </div>

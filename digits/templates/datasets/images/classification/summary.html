@@ -1,10 +1,14 @@
 {# Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved. #}
+<div class="row">
+    <div class="col-sm-12">
+        <h4 style="display:inline;">
+            <a class="btn btn-s btn-info" href="{{ url_for('show_job', job_id=dataset.id()) }}" target="_blank">Dataset - {{dataset.name()}}</a>
+        </h4>
+    </div>
+</div>
 
-<h4>
-    <a href="{{url_for('show_job', job_id=dataset.id())}}" target="_blank">
-        {{dataset.name()}}
-    </a>
-</h4>
+
+
 <p>
 <span class="text-{{dataset.status.css}}">{{dataset.status.name}}</span>
 {% if not dataset.status.is_running() %}
@@ -13,28 +17,53 @@
 </small>
 {% endif %}
 </p>
-<dl>
-    <dt>Image Size</dt>
-    <dd>{{dataset.image_dims[1]}}x{{dataset.image_dims[0]}}</dd>
-    <dt>Image Type</dt>
-    <dd>
-    {% if dataset.image_dims[2] == 3 %}
-    COLOR
-    {% else %}
-    GRAYSCALE
-    {% endif %}
-    </dd>
-    <dt>DB backend</dt>
-    <dd>{{dataset.train_db_task().backend}}</dd>
-    {% for task in dataset.create_db_tasks() %}
-    <dt>{{task.name()}}</dt>
-    <dd>
-    {% if task.entries_count %}
-    {{task.entries_count}} images
-    {% else %}
-    ?
-    {% endif %}
-    </dd>
-    {% endfor %}
-</dl>
 
+<div class="row">
+    <div class="col-sm-6">
+        <dl>
+            <dt>Image Size</dt>
+            <dd>{{dataset.image_dims[1]}}x{{dataset.image_dims[0]}}</dd>
+            <dt>Image Type</dt>
+            <dd>
+            {% if dataset.image_dims[2] == 3 %}
+            COLOR
+            {% else %}
+            GRAYSCALE
+            {% endif %}
+            </dd>
+            <dt>DB backend</dt>
+            <dd>{{dataset.train_db_task().backend}}</dd>
+        </dl>
+    </div>
+    <div class="col-sm-6">
+        <dl>
+            {% for task in dataset.create_db_tasks() %}
+            <dt>{{task.name()}}</dt>
+            <dd>
+            {% if task.entries_count %}
+            {{task.entries_count}} images
+            {% else %}
+            ?
+            {% endif %}
+            </dd>
+            {% endfor %}
+        </dl>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-sm-12">
+    {% if dataset.labels %}
+            <dt>Categories and Class Labels</dt>
+
+            <dd>
+
+            {% for category in dataset.labels.keys() %}
+            <dt>&nbsp{{category}}</dt>
+            <dd>&nbsp&nbsp{{', '.join(dataset.labels[category])}}</dd>
+            {% endfor %}
+
+            </dd>
+            {% endif %}
+    </div>
+</div>

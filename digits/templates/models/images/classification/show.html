@@ -22,6 +22,9 @@
                 <dt>Raw {{task.get_framework_id()}} output</dt>
                 <dd><a href="{{url_for('serve_file', path=task.path(task.log_file, relative=True))}}">{{task.log_file}}</a></dd>
 
+                <dt> Category used to Train </dt>
+                <dd> {{job.category_label}} </dd>
+
                 {% if task.pretrained_model %}
                 <dt>Pretrained Model</dt>
                 <dd>{{task.pretrained_model}}</dd>
@@ -31,7 +34,6 @@
     </div>
     <div class="col-sm-6">
         <div class="well">
-            <h4 class='text-center'>Dataset</h4>
             {% if job.dataset %}
             {% with dataset = job.dataset %}
             {% include 'datasets/images/classification/summary.html' %}

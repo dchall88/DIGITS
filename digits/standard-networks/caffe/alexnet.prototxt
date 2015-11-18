@@ -3,12 +3,11 @@ layer {
   name: "data"
   type: "Data"
   top: "data"
-  top: "label"
   include {
     phase: TRAIN
   }
   transform_param {
-    mirror: true
+    mirror: false
     crop_size: 227
   }
   data_param {
@@ -16,10 +15,20 @@ layer {
   }
 }
 layer {
+  name: "label"
+  type: "HDF5Data"
+  top: "label"
+  include {
+    phase: TRAIN
+  }
+  hdf5_data_param {
+    batch_size: 100
+  }
+}
+layer {
   name: "data"
   type: "Data"
   top: "data"
-  top: "label"
   include {
     phase: TEST
   }
@@ -27,6 +36,17 @@ layer {
     crop_size: 227
   }
   data_param {
+    batch_size: 100
+  }
+}
+layer {
+  name: "label"
+  type: "HDF5Data"
+  top: "label"
+  include {
+    phase: TEST
+  }
+  hdf5_data_param {
     batch_size: 100
   }
 }

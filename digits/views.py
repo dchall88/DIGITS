@@ -130,10 +130,27 @@ def get_job_list(cls, running, dataset_id=None):
                 )
 
 
+def get_experiment_job(cls, model_id):
+    for j in scheduler.jobs:
+        if isinstance(j, cls) and hasattr(j, 'model_id') and (j.model_id == model_id):
+            return j
+    return None
+
+
 def get_dataset_name(job_id):
     for j in scheduler.jobs:
         if isinstance(j, dataset.DatasetJob) and j.id() == job_id:
             return j.name()
+
+@app.route('/experiment/<dataset_id>/<model_id>')
+def home_experiment(dataset_id, model_id):
+
+    job = get_experiment_job(experiment.ExperimentJob, model_id)
+
+    if job is None:
+        return flask.redirect(flask.url_for('image_classification_experiment_new', dataset_id=dataset_id, model_id=model_id))
+    else:
+        return flask.redirect(flask.url_for('show_job', job_id=job.id()))
 
 ### Jobs routes
 

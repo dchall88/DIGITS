@@ -402,30 +402,6 @@ class TrainTask(Task):
         """
         return None
 
-    def get_labels(self):
-        """
-        Read labels from labels_file and return them in a list
-        """
-        # The labels might be set already
-        if hasattr(self, '_labels') and self._labels and len(self._labels) > 0:
-            return self._labels
-
-        assert hasattr(self.dataset, 'labels_file'), 'labels_file not set'
-        assert self.dataset.labels_file, 'labels_file not set'
-        assert os.path.exists(self.dataset.path(self.dataset.labels_file)), 'labels_file does not exist'
-
-        labels = []
-        with open(self.dataset.path(self.dataset.labels_file)) as infile:
-            for line in infile:
-                label = line.strip()
-                if label:
-                    labels.append(label)
-
-        assert len(labels) > 0, 'no labels in labels_file'
-
-        self._labels = labels
-        return self._labels
-
     def lr_graph_data(self):
         """
         Returns learning rate data formatted for a C3.js graph
