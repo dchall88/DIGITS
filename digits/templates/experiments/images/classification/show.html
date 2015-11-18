@@ -34,7 +34,7 @@ function deleteJob(job_id) {
         <div class="well">
             {% if job.dataset %}
             {% with dataset = job.dataset %}
-            {% include 'datasets/summary.html' %}
+            {% include 'datasets/images/classification/summary.html' %}
             {% endwith %}
             {% endif %}
         </div>

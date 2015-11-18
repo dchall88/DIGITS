@@ -185,7 +185,7 @@ class Task(StatusCls):
         self.before_run()
 
         env = os.environ.copy()
-        args = self.task_arguments(resources, env )
+        args = self.task_arguments(resources, env)
         if not args:
             self.logger.error('Could not create the arguments for Popen')
             self.status = Status.ERROR

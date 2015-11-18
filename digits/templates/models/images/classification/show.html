@@ -2,6 +2,12 @@
 
 {% extends "job.html" %}
 
+{% block nav %}
+<li><a href="{{ url_for('home')}}">Datasets</a></li>
+<li><a href="{{ url_for('home', dataset_id=job.dataset_id)}}">Models</a></li>
+{{ super() }}
+{% endblock %}
+
 {% block job_content %}
 
 <script src="{{ url_for('static', filename='js/model-graphs.js') }}"></script>

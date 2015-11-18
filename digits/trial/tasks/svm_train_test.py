@@ -87,7 +87,7 @@ class SVMTask(Task):
         return None
 
     @override
-    def task_arguments(self, resources):
+    def task_arguments(self, resources, env):
 
         args = [sys.executable, os.path.join(os.path.dirname(os.path.dirname(digits.__file__)), 'tools', 'svm_train_test.py'),
                 self.YTrain_file,

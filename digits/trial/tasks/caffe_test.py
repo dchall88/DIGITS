@@ -109,7 +109,7 @@ class CaffeTestTask(TestTask):
         return None
 
     @override
-    def task_arguments(self, resources):
+    def task_arguments(self, resources, env):
 
         args = [sys.executable, os.path.join(os.path.dirname(os.path.dirname(digits.__file__)), 'tools', 'caffe_test.py'),
                 self.model.path(self.test_file),

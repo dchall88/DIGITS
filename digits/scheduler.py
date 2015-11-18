@@ -16,6 +16,8 @@ from status import Status
 from job import Job
 from dataset import DatasetJob
 from model import ModelJob
+from experiment import ExperimentJob
+from trial import TrialJob
 from digits.utils import errors
 from log import logger
 
@@ -95,8 +97,12 @@ class Scheduler:
         self.resources = {
                 # TODO: break this into CPU cores, memory usage, IO usage, etc.
                 'parse_folder_task_pool': [Resource()],
+                'parse_json_task_pool': [Resource()],
                 'create_db_task_pool': [Resource(max_value=2)],
                 'analyze_db_task_pool': [Resource(max_value=4)],
+                'caffe_extract_features_task_pool': [Resource(max_value=2)],
+                'caffe_test_task_pool': [Resource(max_value=2)],
+                'svm_test_task_pool': [Resource(max_value=2)],
                 'gpus': [Resource(identifier=index)
                     for index in gpu_list.split(',')] if gpu_list else [],
                 }
@@ -162,6 +168,40 @@ class Scheduler:
                             print '\t%s' % e
                         else:
                             print 'Caught %s while loading job "%s"' % (type(e).__name__, job.id())
+
+        # add ExperimentJobs
+        for job in loaded_jobs:
+            if isinstance(job, ExperimentJob):
+                try:
+                    # load the DatasetJob
+                    job.load_dataset()
+                    self.jobs.append(job)
+                except Exception as e:
+                    failed += 1
+                    if self.verbose:
+                        if str(e):
+                            print 'Caught %s while loading job "%s":' % (type(e).__name__, job.id())
+                            print '\t%s' % e
+                        else:
+                            print 'Caught %s while loading job "%s"' % (type(e).__name__, job.id())
+
+        # add TrialJobs
+        for job in loaded_jobs:
+            if isinstance(job, TrialJob):
+                try:
+                    # load the TrialJob
+                    job.load_experiment()
+                    self.jobs.append(job)
+                except Exception as e:
+                    failed += 1
+                    if self.verbose:
+                        if str(e):
+                            print 'Caught %s while loading job "%s":' % (type(e).__name__, job.id())
+                            print '\t%s' % e
+                        else:
+                            print 'Caught %s while loading job "%s"' % (type(e).__name__, job.id())
+
+
 
         if failed > 0 and self.verbose:
             print 'WARNING:', failed, 'jobs failed to load.'
@@ -254,8 +294,21 @@ class Scheduler:
                         if isinstance(j, ModelJob) and j.dataset_id == job.id():
                             logger.error('Cannot delete "%s" (%s) because "%s" (%s) depends on it.' % (job.name(), job.id(), j.name(), j.id()))
                             dependent_jobs.append(j.name())
-                if len(dependent_jobs)>0:
-                    error_message = 'Cannot delete "%s" because %d model%s depend%s on it: %s' % (
+                elif isinstance(job, ModelJob):
+                    # check for dependencies
+                    for j in self.jobs:
+                        if isinstance(j, ExperimentJob) and j.model_id == job.id():
+                            logger.error('Cannot delete %s (%s) because %s (%s) depends on it.' % (job.name(), job.id(), j.name(), j.id()))
+                            dependent_jobs.append(j.name())
+                elif isinstance(job, ExperimentJob):
+                    # check for dependencies
+                    for j in self.jobs:
+                        if isinstance(j, TrialJob) and j.experiment_id == job.id():
+                            logger.error('Cannot delete %s (%s) because %s (%s) depends on it.' % (job.name(), job.id(), j.name(), j.id()))
+                            dependent_jobs.append(j.name())
+
+                if len(dependent_jobs) > 0:
+                    error_message = 'Cannot delete "%s" because %d job%s depend%s on it: %s' % (
                             job.name(),
                             len(dependent_jobs),
                             ('s' if len(dependent_jobs) != 1 else ''),
@@ -314,6 +367,20 @@ class Scheduler:
                 [j for j in self.jobs if isinstance(j, ModelJob) and not j.status.is_running()],
                 cmp=lambda x,y: cmp(y.id(), x.id())
                 )
+
+    def running_experiment_jobs(self):
+        """a query utility"""
+        return sorted(
+                [j for j in self.jobs if isinstance(j, ExperimentJob) and j.status.is_running()],
+                cmp=lambda x,y: cmp(y.id(), x.id())
+                )
+
+    def completed_experiment_jobs(self):
+        """a query utility"""
+        return sorted(
+                [j for j in self.jobs if isinstance(j, ExperimentJob) and not j.status.is_running()],
+                cmp=lambda x,y: cmp(y.id(), x.id())
+        )
 
     def start(self):
         """

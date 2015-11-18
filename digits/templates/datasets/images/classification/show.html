@@ -113,6 +113,11 @@
 </div>
 {% endmacro %}
 
+{% block nav %}
+<li><a href="{{ url_for('home')}}">Datasets</a></li>
+{{ super() }}
+{% endblock %}
+
 {% block job_content %}
 <style>
     .distribution-graph g.c3-axis-x g.tick {
