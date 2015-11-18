@@ -308,6 +308,7 @@ def _create_lmdb(image_count, write_queue, batch_size, output_dir,
     images_written = 0
     image_sum = None
     batch = []
+    all_labels = []
     compute_mean = bool(mean_files)
 
     db = lmdb.open(output_dir,
@@ -338,8 +339,9 @@ def _create_lmdb(image_count, write_queue, batch_size, output_dir,
 
         if not write_queue.empty():
             image, label = write_queue.get()
-            datum = _array_to_datum(image, label, encoding)
+            datum = _array_to_datum(image, encoding)
             batch.append(datum)
+            all_labels.append(label)
 
             if len(batch) == batch_size:
                 _write_batch_lmdb(db, batch, images_written)
@@ -364,6 +366,17 @@ def _create_lmdb(image_count, write_queue, batch_size, output_dir,
 
     if compute_mean:
         _save_means(image_sum, images_written, mean_files)
+
+    # Write labels to hdf5 file
+    name = os.path.basename(output_dir)
+    all_labels = np.array(all_labels)
+    for index, all_labels1 in enumerate(all_labels.T):
+        fname = name[:-3] + '_' + str(index) + '.h5'
+        label_name = name[:-3] + '_' + 'label' + '_' + str(index) + '.txt'
+        with h5py.File(fname, 'w') as f:
+            f['label'] = all_labels1.astype(np.float32)
+        with open(label_name, 'w') as f:
+            f.write(os.path.join(os.path.dirname(output_dir), fname) + '\n')
 
     db.close()
 
@@ -487,8 +500,9 @@ def _fill_load_queue(filename, queue, shuffle):
         raise BadInputFileError('No valid lines in input file')
     logger.info('%s valid lines in file' % valid_lines)
 
-    for key in sorted(distribution):
-        logger.debug('Category %s has %d images.' % (key, distribution[key]))
+    for category_type in distribution:
+        for key in sorted(distribution[category_type]):
+            logger.debug('Type %s: Category %s has %d images.' % (category_type, key, distribution[category_type][key]))
 
     return valid_lines
 
@@ -500,15 +514,21 @@ def _parse_line(line, distribution):
     if not line:
         raise ParseLineError
 
-    # Expect format - [/]path/to/file.jpg 123
-    match = re.match(r'(.+)\s+(\d+)\s*$', line)
+    # Expect format - [/]path/to/file.jpg 123 123 ...
+    match = re.match(r'(.+[.]\S+)\s+(\d+(\s\d*)*)\s*$', line)
     if match is None:
         raise ParseLineError
 
     path = match.group(1)
-    label = int(match.group(2))
+    label = [int(l) for l in match.group(2).split()]
 
-    distribution[label] += 1
+    for category_type, label1 in enumerate(label):
+        if category_type not in distribution:
+            distribution[category_type] = Counter()
+        if label1 not in distribution[category_type]:
+            distribution[category_type][label1] = 1
+        else:
+            distribution[category_type][label1] += 1
 
     return path, label
 
@@ -586,7 +606,7 @@ def _initial_image_sum(width, height, channels):
     else:
         return np.zeros((height, width, channels), np.float64)
 
-def _array_to_datum(image, label, encoding):
+def _array_to_datum(image, encoding):
     """
     Create a caffe Datum from a numpy.ndarray
     """
@@ -604,7 +624,7 @@ def _array_to_datum(image, label, encoding):
             image = image[np.newaxis,:,:]
         else:
             raise Exception('Image has unrecognized shape: "%s"' % image.shape)
-        datum = caffe.io.array_to_datum(image, label)
+        datum = caffe.io.array_to_datum(image)
     else:
         datum = caffe_pb2.Datum()
         if image.ndim == 3:
@@ -613,7 +633,6 @@ def _array_to_datum(image, label, encoding):
             datum.channels = 1
         datum.height = image.shape[0]
         datum.width = image.shape[1]
-        datum.label = label
 
         s = StringIO()
         if encoding == 'png':
@@ -633,7 +652,7 @@ def _write_batch_lmdb(db, batch, image_count):
     try:
         with db.begin(write=True) as lmdb_txn:
             for i, datum in enumerate(batch):
-                key = '%08d_%d' % (image_count + i, datum.label)
+                key = '%08d' % (image_count + i)
                 lmdb_txn.put(key, datum.SerializeToString())
 
     except lmdb.MapFullError:

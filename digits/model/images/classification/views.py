@@ -477,8 +477,8 @@ def image_classification_model_top_n():
 def get_category_names(dataset_id):
     for j in scheduler.jobs:
         if isinstance(j, ImageClassificationDatasetJob) and (j.id() == dataset_id):
-            j.load_labels()
-            category_names = [(category_index, '%s' % category) for category_index, category in enumerate(j.labels.keys())]
+            labels = j.get_labels()
+            category_names = [(category_index, '%s' % category) for category_index, category in enumerate(labels.keys())]
             return j.name(), category_names
 
     return 'none', [(-1, 'None')]

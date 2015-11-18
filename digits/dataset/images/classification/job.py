@@ -73,7 +73,9 @@ class ImageClassificationDatasetJob(ImageDatasetJob):
                 return t
         return None
 
-    def load_labels(self):
+    def get_labels(self):
+        if hasattr(self, 'labels') and self.labels and len(self.labels) > 0:
+            return self.labels
 
         if not os.path.exists(self.path(self.labels_file)):
             self.labels = None
@@ -85,4 +87,6 @@ class ImageClassificationDatasetJob(ImageDatasetJob):
                     line = line.split(' ')
                     if line:
                         self.labels[line[0]] = line[1:]
+        return self.labels
+
 

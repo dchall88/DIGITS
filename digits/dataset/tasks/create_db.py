@@ -4,6 +4,7 @@ import sys
 import os.path
 import re
 import operator
+from collections import OrderedDict
 
 import digits
 from digits import utils
@@ -186,12 +187,14 @@ class CreateDbTask(Task):
             return True
 
         # distribution
-        match = re.match(r'Category (\d+) has (\d+)', message)
+        match = re.match(r'Type (\d+): Category (\d+) has (\d+)', message)
         if match and self.labels_file is not None:
             if not hasattr(self, 'distribution') or self.distribution is None:
-                self.distribution = {}
+                self.distribution = OrderedDict()
+            if int(match.group(1)) not in self.distribution:
+                self.distribution[int(match.group(1))] = {}
 
-            self.distribution[match.group(1)] = int(match.group(2))
+            self.distribution[int(match.group(1))][int(match.group(2))] = int(match.group(3))
 
             data = self.distribution_data()
             if data:
@@ -270,22 +273,29 @@ class CreateDbTask(Task):
         """
         if self.distribution is None:
             return None
-        try:
-            labels = self.get_labels()
-        except AssertionError:
+        if self.labels_file is None:
             return None
-
-        if len(self.distribution.keys()) != len(labels):
+        if not hasattr(self, 'labels'):
+            self.labels = OrderedDict()
+            with open(self.path(self.labels_file), 'r') as infile:
+                for line in infile:
+                    line = line.strip()
+                    line = line.split(' ')
+                    if line:
+                        self.labels[line[0]] = line[1:]
+        if len(self.distribution.keys()) != len(self.labels):
             return None
 
         values = ['Count']
         titles = []
-        for key, value in sorted(
-                self.distribution.items(),
-                key=operator.itemgetter(1),
-                reverse=True):
-            values.append(value)
-            titles.append(labels[int(key)])
+        for category_index, category_label in enumerate(self.labels.keys()):
+            for index, class_label in enumerate(self.labels[category_label]):
+                if index in self.distribution[category_index]:
+                    values.append(self.distribution[category_index][index])
+                    titles.append(class_label)
+                else:
+                    values.append(0)
+                    titles.append(class_label)
 
         return {
                 'data': {
