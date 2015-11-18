@@ -12,10 +12,12 @@ from digits.dataset import tasks
 from forms import ImageClassificationDatasetForm
 from job import ImageClassificationDatasetJob
 
+import h5py
 import lmdb
 import PIL.Image
 from StringIO import StringIO
 import caffe_pb2
+
 
 NAMESPACE = '/datasets/images/classification'
 
@@ -387,18 +389,28 @@ def image_classification_dataset_explore():
     if task.backend != 'lmdb':
         raise ValueError("Backend is {0} while expected backend is lmdb".format(task.backend))
     db_path = job.path(task.db_name)
-    labels = task.get_labels()
+
+    category_labels = job.get_labels()
+    labels = {}
+    for k, gt_category_type in enumerate(category_labels):
+        fname = db_path[:-3] + '_' + str(k) + '.h5'
+        labels[gt_category_type] = h5py.File(fname, 'r')
 
     page = int(flask.request.args.get('page', 0))
     size = int(flask.request.args.get('size', 25))
     label = flask.request.args.get('label', None)
+    category_type = flask.request.args.get('type', None)
+
+    if label == 'None' and category_type == 'None':
+        label = None
+        category_type = None
 
     if label is not None:
-        try:
-            label = int(label)
-            label_str = labels[label]
-        except ValueError:
-            label = None
+        label = int(label)
+        #try:
+        #    label = int(label)
+        #except ValueError:
+        #    label = None
 
     reader = DbReader(db_path)
     count = 0
@@ -408,7 +420,7 @@ def image_classification_dataset_explore():
     if label is None:
         total_entries = reader.total_entries
     else:
-        total_entries = task.distribution[str(label)]
+        total_entries = task.distribution[0][label]
 
     max_page = min((total_entries-1) / size, page + 5)
     pages = range(min_page, max_page + 1)
@@ -416,7 +428,11 @@ def image_classification_dataset_explore():
         if count >= page*size:
             datum = caffe_pb2.Datum()
             datum.ParseFromString(value)
-            if label is None or datum.label == label:
+            if category_type is not None:
+                gt_label = int(labels[category_type]['label'][int(key)])
+            else:
+                gt_label = [int(labels[c]['label'][int(key)]) for c in category_labels]
+            if label is None or gt_label == label:
                 if datum.encoded:
                     s = StringIO()
                     s.write(datum.data)
@@ -435,15 +451,20 @@ def image_classification_dataset_explore():
                         # XXX see issue #59
                         arr = arr[:,:,[2,1,0]]
                     img = PIL.Image.fromarray(arr)
-                imgs.append({"label":labels[datum.label], "b64": utils.image.embed_image_html(img)})
+                if category_type is not None:
+                    gt_class = category_labels[category_type][gt_label]
+                else:
+                    gt_class = [category_labels[c][gt_label[k]] for k, c in enumerate(category_labels)]
+                    gt_class = ', '.join(gt_class)
+                    #gt_class = category_labels[category_labels.keys()[0]][gt_label[0]]
+                imgs.append({"label": gt_class, "b64": utils.image.embed_image_html(img)})
         if label is None:
             count += 1
         else:
-            datum = caffe_pb2.Datum()
-            datum.ParseFromString(value)
-            if datum.label == int(label):
+            gt_label = int(labels[category_type]['label'][int(key)])
+            if gt_label == int(label):
                 count += 1
         if len(imgs) >= size:
             break
 
-    return flask.render_template('datasets/images/classification/explore.html', page=page, size=size, job=job, imgs=imgs, labels=labels, pages=pages, label=label, total_entries=total_entries, db=db)
+    return flask.render_template('datasets/images/classification/explore.html', page=page, size=size, job=job, imgs=imgs, category_labels=category_labels, pages=pages, label=label, type=category_type, total_entries=total_entries, db=db)
