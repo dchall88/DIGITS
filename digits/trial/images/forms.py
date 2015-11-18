@@ -2,18 +2,12 @@
 
 import wtforms
 from wtforms import validators
-
+from digits import utils
 from ..forms import TrialForm
 
 class ImageTrialForm(TrialForm):
     """
     Defines the form used to create a new ImageTrialJob
     """
-
-    crop_size = wtforms.IntegerField('Crop Size',
-            validators = [validators.Optional()]
-            )
-    use_mean = wtforms.BooleanField('Subtract Mean File',
-            default = True
-            )
+    pass
 

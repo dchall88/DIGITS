@@ -1536,8 +1536,11 @@ class CaffeTrainTask(TrainTask):
             if self.crop_size:
                 batch_deploy_data_layer.transform_param.crop_size = self.crop_size
 
-        if self.use_mean:
-            batch_deploy_data_layer.transform_param.mean_file = self.dataset.path(self.dataset.train_db_task().mean_file)
+        if self.use_mean == 'pixel':
+            mean_pixel = self.get_mean_pixel(self.dataset.path(self.dataset.train_db_task().mean_file))
+            self.set_mean_value(batch_deploy_data_layer, mean_pixel)
+        elif self.use_mean == 'image':
+            self.set_mean_file(batch_deploy_data_layer, self.dataset.path(self.dataset.train_db_task().mean_file))
 
         if train_data_layer.transform_param.HasField('scale'):
             batch_deploy_data_layer.transform_param.scale = train_data_layer.transform_param.scale

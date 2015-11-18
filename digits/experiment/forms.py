@@ -3,7 +3,7 @@
 import os
 
 from flask.ext.wtf import Form
-import wtforms
+from digits import utils
 from wtforms import validators
 
 class ExperimentForm(Form):
@@ -13,9 +13,9 @@ class ExperimentForm(Form):
 
         
     ### Models
-    model_snapshots = wtforms.SelectField('Snapshots',
+    model_snapshots = utils.forms.SelectField('Snapshots',
                 validators = [validators.Optional()]
                 )
 
-    model_layers = wtforms.SelectMultipleField('Select Layers', choices=[], validators=[validators.Required()])
+    model_layers = utils.forms.SelectMultipleField('Select Layers', choices=[], validators=[validators.DataRequired()])
 

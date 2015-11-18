@@ -1,10 +1,9 @@
 # Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
 
-import os
-
 from flask.ext.wtf import Form
-import wtforms
 from wtforms import validators
+from digits import utils
+
 
 class TrialForm(Form):
 
@@ -13,36 +12,36 @@ class TrialForm(Form):
 
         
     ### Learning Method
-    learning_method = wtforms.SelectField('Select Learning Method', choices=[])
+    learning_method = utils.forms.SelectField('Select Learning Method', choices=[])
     
     ### Layers
-    layers = wtforms.SelectField('Layers', choices=[], validators = [validators.Optional()])
+    layers = utils.forms.SelectField('Layers', choices=[], validators = [validators.Optional()])
     
     ### Labels
-    category_names = wtforms.SelectField('Select Category Name', choices=[])
+    category_names = utils.forms.SelectField('Select Category Name', choices=[])
               
     ### Name      
-    trial_name = wtforms.StringField('Trial Name',
+    trial_name = utils.forms.StringField('Trial Name',
             validators = [
-                validators.Required()
+                validators.DataRequired()
                 ]
             )
 
     ### SVM Parameters
-    normalise = wtforms.SelectField(u'Normalise Features',
+    normalise = utils.forms.SelectField(u'Normalise Features',
             default='1',
             choices=[
                 ('0', 'No'),
                 ('1', 'Yes'),
                 ]
             )
-    C = wtforms.FloatField('Penalty Parameter',
+    C = utils.forms.FloatField('Penalty Parameter',
             validators = [
                 validators.NumberRange(min=0)
                 ],
             default=0.1,
             )
-    class_weight = wtforms.SelectField(u'Class Weight',
+    class_weight = utils.forms.SelectField(u'Class Weight',
             default='auto',
             choices=[
                 ('none', 'none'),
@@ -51,4 +50,4 @@ class TrialForm(Form):
             )
     
     ### AdaBoost Parameters
-    adaboost_parameters = wtforms.StringField('AdaBoost Parameters',)
+    adaboost_parameters = utils.forms.StringField('AdaBoost Parameters (IN DEVELOPMENT)',)
