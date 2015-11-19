@@ -7,14 +7,20 @@ import shutil
 import tempfile
 import random
 import copy
+import io
+import tarfile
+import zipfile
 
 import numpy as np
 from flask import render_template, request, redirect, url_for, flash
 
+import flask
+import werkzeug.exceptions
+
 import digits
 from digits.config import config_value
 from digits import utils
-from digits.webapp import app, scheduler
+from digits.webapp import app, scheduler, autodoc
 from digits.dataset import ImageClassificationDatasetJob
 from digits.model import ImageClassificationModelJob
 from digits.trial import ImageClassificationTrialJob
@@ -210,6 +216,41 @@ def image_classification_experiment_add_layers_create(experiment_id):
             scheduler.delete_job(job)
         raise
 
+
+@app.route(NAMESPACE + '/<job_id>/download',
+        methods=['GET', 'POST'],
+        defaults={'extension': 'tar.gz'})
+@app.route(NAMESPACE + '/<job_id>/download.<extension>',
+        methods=['GET', 'POST'])
+@autodoc('experiments')
+def features_download(job_id, extension):
+    """
+    Return a tarball of all features extracted from the model
+    """
+    job = scheduler.get_job(job_id)
+    if job is None:
+        raise werkzeug.exceptions.NotFound('Job not found')
+
+    b = io.BytesIO()
+    if extension in ['tar', 'tar.gz', 'tgz', 'tar.bz2']:
+        # tar file
+        mode = ''
+        if extension in ['tar.gz', 'tgz']:
+            mode = 'gz'
+        elif extension in ['tar.bz2']:
+            mode = 'bz2'
+        with tarfile.open(fileobj=b, mode='w:%s' % mode) as tf:
+            tf.add(job.dir(), arcname='features')
+    elif extension in ['zip']:
+        with zipfile.ZipFile(b, 'w') as zf:
+            zf.write(job.dir(), arcname='features')
+    else:
+        raise werkzeug.exceptions.BadRequest('Invalid extension')
+
+    response = flask.make_response(b.getvalue())
+    response.headers['Content-Disposition'] = 'attachment; filename=%s.%s' % (job.id(), extension)
+    return response    
+    
 def show(job):
     """
     Called from digits.views.show_job()

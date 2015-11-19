@@ -67,7 +67,24 @@ function deleteJob(job_id) {
                 <dt> Extracted Layers </dt>
                 <dd> {{', '.join(job.layers)}} </dd>
             </dl>
-            <a class="btn btn-warning" style="white-space:normal;" href="{{ url_for('image_classification_experiment_add_layers', experiment_id=job.id()) }}">Extract More Layers</a>
+            <ul class="list-unstyled">
+                <li>
+                    <a class="btn btn-warning" style="white-space:normal;" href="{{ url_for('image_classification_experiment_add_layers', experiment_id=job.id()) }}">Extract More Layers</a>
+                </li>
+                <li><h4></h4></li>
+                <li> 
+                   <form>
+                       <button
+                           formaction="{{url_for('features_download', job_id=job.id())}}"
+                           formmethod="post"
+                           formenctype="multipart/form-data"
+                           class="btn btn-info"
+                           style="white-space:normal;">
+                           Download Features
+                       </button>
+                   </form>
+                </li>
+           </ul>              
         </div>
     </div>
 </div>
