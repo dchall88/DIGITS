@@ -86,6 +86,40 @@ function showResizeExample()
 }
                 </script>
             </div>
+
+            <div class="row">
+                <div class="form-group{{mark_errors([form.bbox_mode])}}">
+                    {{ form.bbox_mode.label }}
+                    {{ form.bbox_mode.tooltip }}
+                    {{ form.bbox_mode(class='form-control') }}
+                </div>
+            </div>
+
+            <div class="row">
+                <div id="scale_factor" style="display:none;" class={{mark_errors([form.scale_factor])}}>
+                        {{ form.scale_factor.label }}
+                        {{ form.scale_factor.tooltip }}
+                        {{ form.scale_factor(class='form-control') }}
+                </div>
+
+<script>
+    function hasBBoxModeChanged() {
+        val = $("#bbox_mode").val();
+        if (val == "0")
+        {
+            $("#scale_factor").prop("disabled", "1");
+            $("#scale_factor").hide();
+        }
+        else
+        {
+            $("#scale_factor").prop("disabled", "0");
+            $("#scale_factor").show();
+        }
+    }
+    $("#bbox_mode").change(hasBBoxModeChanged);
+    hasBBoxModeChanged();
+</script>
+            </div>
         </div>
 
         <div class="col-sm-8">
@@ -93,6 +127,7 @@ function showResizeExample()
             <ul class="nav nav-tabs" id="db-tabs" role="tablist">
                 <li><a href="#db-folder" role="tab" data-toggle="tab">Use Image Folder</a></li>
                 <li><a href="#db-textfile" role="tab" data-toggle="tab">Use Text Files</a></li>
+                <li><a href="#db-jsonfile" role="tab" data-toggle="tab">Use Json Annotation File</a></li>
             </ul>
 
             <!-- Tab panes -->
@@ -312,7 +347,50 @@ hasTestFolderChanged();
                     </div>
                 </div>
 
+                 <!-- JSON Annotation -->
+                <div class="tab-pane" id="db-jsonfile">
+                    <div class="row">
+                        <table class="table">
+                            <tr>
+
+                                <th width="60%">JSON Annotation file <span name="json_file_explanation"
+                                    class="explanation-tooltip glyphicon glyphicon-question-sign"
+                                    data-container="body"
+                                    title="Can also upload pickle files. Refer to ??? for details on how the JSON or PKL file should be formatted"
+                                ></span></th>
+
+                                <th>Root Path <i>(optional)</i> <span name="root_path_explanation"
+                                    class="explanation-tooltip glyphicon glyphicon-question-sign"
+                                    data-container="body"
+                                    title="The root path will be prepended to the image paths in the annotation file"
+                                ></span></th>
+                            </tr>
+                            <tr>
+                                <td class="form-group{{mark_errors([form.jsonfile_annotations.errors])}}">
+                                    {{ form.jsonfile_annotations(class='form-control') }}
+                                </td>
+                                <td class="form-group{{mark_errors([form.jsonfile_root_path.errors])}}">
+                                    {{ form.jsonfile_root_path(class='form-control') }}
+                                </td>
+                            </tr>
+                            <tr>
+
+                                <th>Train/Val/Test Split file <span name="train_test_split_explanation"
+                                    class="explanation-tooltip glyphicon glyphicon-question-sign"
+                                    data-container="body"
+                                    title="Path to train/val/test split file. Each line correponds to set of videos to use. If none, just randomnly split the data"
+                                ></span></th>
+                            </tr>
+                            <tr>
+                                <td class="form-group{{mark_errors([form.jsonfile_train_test_split.errors])}}">
+                                    {{ form.jsonfile_train_test_split(class='form-control') }}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
             </div>
+
         </div>
     </div>
     {{ form.method(style="display:none;") }}

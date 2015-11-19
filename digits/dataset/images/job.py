@@ -18,6 +18,8 @@ class ImageDatasetJob(DatasetJob):
         """
         self.image_dims = kwargs.pop('image_dims', None)
         self.resize_mode = kwargs.pop('resize_mode', None)
+        self.get_bboxes = kwargs.pop('bbox_mode', None)
+        self.scale_factor = kwargs.pop('scale_factor', None)
 
         super(ImageDatasetJob, self).__init__(**kwargs)
         self.pickver_job_dataset_image = PICKLE_VERSION

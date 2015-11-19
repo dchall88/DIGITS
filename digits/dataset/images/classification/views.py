@@ -257,6 +257,91 @@ def from_files(job, form):
                 )
 
 
+def from_json(job, form):
+
+    """
+    Add tasks for creating a dataset by parsing folders of images
+    """
+    root_path = form.jsonfile_root_path.data.strip()
+    if not root_path:
+        root_path = None
+
+    job.labels_file = utils.constants.LABELS_FILE
+
+    flask.request.files[form.jsonfile_train_test_split.name].save(
+            os.path.join(job.dir(), utils.constants.SPLIT_FILE)
+            )
+
+    flask.request.files[form.jsonfile_annotations.name].save(
+            os.path.join(job.dir(), utils.constants.JSON_FILE)
+            )
+    ### Add JsonTask
+
+    parse_json_task = tasks.ParseJsonTask(
+            job_dir = job.dir(),
+            job = job,
+            json_annotation_file = utils.constants.JSON_FILE,
+            train_test_split_file = utils.constants.SPLIT_FILE,
+            )
+    job.tasks.append(parse_json_task)
+
+
+    ### Add CreateDbTasks
+
+    encoding = form.encoding.data
+
+    job.tasks.append(
+            tasks.CreateDbTask(
+                job_dir     = job.dir(),
+                parents     = parse_json_task,
+                input_file  = utils.constants.TRAIN_FILE,
+                db_name     = utils.constants.TRAIN_DB,
+                image_dims  = job.image_dims,
+                image_folder= root_path,
+                resize_mode = job.resize_mode,
+                mean_file   = utils.constants.MEAN_FILE_CAFFE,
+                labels_file = job.labels_file,
+                encoding      = encoding,
+                get_bboxes  = job.get_bboxes,
+                scale_factor = job.scale_factor,
+                )
+            )
+
+    job.tasks.append(
+            tasks.CreateDbTask(
+                job_dir     = job.dir(),
+                parents     = parse_json_task,
+                input_file  = utils.constants.VAL_FILE,
+                db_name     = utils.constants.VAL_DB,
+                image_dims  = job.image_dims,
+                image_folder= root_path,
+                resize_mode = job.resize_mode,
+                labels_file = job.labels_file,
+                encoding      = encoding,
+                get_bboxes  = job.get_bboxes,
+                scale_factor = job.scale_factor,
+                shuffle = False,
+                )
+            )
+
+    job.tasks.append(
+            tasks.CreateDbTask(
+                job_dir     = job.dir(),
+                parents     = parse_json_task,
+                input_file  = utils.constants.TEST_FILE,
+                db_name     = utils.constants.TEST_DB,
+                image_dims  = job.image_dims,
+                image_folder= root_path,
+                resize_mode = job.resize_mode,
+                labels_file = job.labels_file,
+                encoding      = encoding,
+                get_bboxes  = job.get_bboxes,
+                scale_factor = job.scale_factor,
+                shuffle = False,
+                )
+            )
+
+
 @app.route(NAMESPACE + '/new', methods=['GET'])
 @autodoc('datasets')
 def image_classification_dataset_new():
@@ -307,6 +392,9 @@ def image_classification_dataset_create():
 
         elif form.method.data == 'textfile':
             from_files(job, form)
+
+        elif form.method.data == 'jsonfile':
+                from_json(job, form)
 
         else:
             raise ValueError('method not supported')

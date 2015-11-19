@@ -8,6 +8,14 @@ from sets import Set
 import re
 from digits.utils.routing import get_request_arg
 
+
+def validate_bounding_box_with_json():
+    def _validator(form, field):
+        if form.method.data != 'jsonfile' and field.data == '1':
+            raise validators.ValidationError('Can only extract bounding boxes if using a json file')
+    return _validator
+
+
 def validate_required_iff(**kwargs):
     """
     Used as a validator within a wtforms.Form

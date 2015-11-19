@@ -72,11 +72,6 @@ def home(dataset_id=None):
                             'id': 'images',
                             'url': flask.url_for('image_classification_dataset_new'),
                             },
-                        # {
-                        #     'title': 'Bounding Boxes',
-                        #     'id': 'bboxes',
-                        #     'url': flask.url_for('bounding_box_dataset_new'),
-                        #     },
                         {
                             'title': 'Generic',
                             'id': 'generic',

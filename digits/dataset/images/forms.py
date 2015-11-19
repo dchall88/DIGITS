@@ -6,6 +6,7 @@ from wtforms import validators
 from ..forms import DatasetForm
 from job import ImageDatasetJob
 from digits import utils
+from digits.utils.forms import validate_bounding_box_with_json
 
 class ImageDatasetForm(DatasetForm):
     """
@@ -42,4 +43,20 @@ class ImageDatasetForm(DatasetForm):
             default='squash',
             choices=ImageDatasetJob.resize_mode_choices(),
             tooltip = "Options for dealing with aspect ratio changes during resize. See examples below."
+            )
+
+    ### Extract Bounding Boxes
+    bbox_mode = utils.forms.SelectField(u'Extract Bounding Boxes',
+            default='0',
+            choices=[
+                ('0', 'No'),
+                ('1', 'Yes'),
+                ],
+            tooltip="Extract regions from the image defined by bounding boxes."
+            )
+
+    scale_factor = utils.forms.FloatField(u'Scale Factor',
+            default=1.0,
+            validators=[validators.DataRequired(), validators.NumberRange(min=1),],
+            tooltip="Add uniform padding to the bounding box by specifying a scale factor"
             )

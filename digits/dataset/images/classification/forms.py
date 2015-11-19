@@ -313,3 +313,16 @@ class ImageClassificationDatasetForm(ImageDatasetForm):
             tooltip = "The 'i'th line of the file should give the string label associated with the '(i-1)'th numberic label. (E.g. the string label for the numeric label 0 is supposed to be on line 1.)"
             )
 
+    ### Method - jsonfile
+
+    jsonfile_annotations = utils.forms.FileField(u'JSON Annotation File',
+            validators=[
+                validate_required_iff(method='jsonfile')
+                ]
+            )
+    jsonfile_root_path = utils.forms.StringField(u'Root path for images')
+    jsonfile_train_test_split = utils.forms.FileField(u'Train/Val/Test Split File',
+            validators=[
+                validate_required_iff(method='jsonfile')
+                ]
+        )

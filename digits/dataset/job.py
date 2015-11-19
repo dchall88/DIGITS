@@ -51,6 +51,12 @@ class DatasetJob(Job):
         """
         return [t for t in self.tasks if isinstance(t, tasks.ParseFolderTask)]
 
+    def parse_json_tasks(self):
+        """
+        Return all ParseFolderTasks for this job
+        """
+        return [t for t in self.tasks if isinstance(t, tasks.ParseJsonTask)]
+
     def create_db_tasks(self):
         """
         Return all CreateDbTasks for this job
