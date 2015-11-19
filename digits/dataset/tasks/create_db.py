@@ -43,6 +43,8 @@ class CreateDbTask(Task):
         self.compression = kwargs.pop('compression', None)
         self.mean_file = kwargs.pop('mean_file', None)
         self.labels_file = kwargs.pop('labels_file', None)
+        self.get_bboxes = kwargs.pop('get_bboxes', False)
+        self.scale_factor = kwargs.pop('scale_factor', None)
 
         super(CreateDbTask, self).__init__(**kwargs)
         self.pickver_task_createdb = PICKLE_VERSION
@@ -149,6 +151,7 @@ class CreateDbTask(Task):
                 '--backend=%s' % self.backend,
                 '--channels=%s' % self.image_dims[2],
                 '--resize_mode=%s' % self.resize_mode,
+                '--get_bboxes=%d' % self.get_bboxes,
                 ]
 
         if self.mean_file is not None:
@@ -165,6 +168,8 @@ class CreateDbTask(Task):
             args.append('--compression=%s' % self.compression)
         if self.backend == 'hdf5':
             args.append('--hdf5_dset_limit=%d' % 2**31)
+        if self.scale_factor:
+            args.append('--scale_factor=%s' % self.scale_factor,)
 
         return args
 

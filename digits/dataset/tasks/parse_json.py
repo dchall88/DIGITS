@@ -86,7 +86,7 @@ class ParseJsonTask(Task):
         return None
 
     @override
-    def task_arguments(self, resources):
+    def task_arguments(self, resources, env):
         args = [sys.executable, os.path.join(os.path.dirname(os.path.dirname(digits.__file__)), 'tools', 'parse_json.py'),
                 self.json_file,
                 self.train_test_split_file,
@@ -155,7 +155,7 @@ class ParseJsonTask(Task):
         return True
 
 
-    @override
-    def after_run(self):
-        if self.job is not None:
-            self.job.load_labels()
+    #@override
+    #def after_run(self):
+    #    if self.job is not None:
+    #        self.job.load_labels()

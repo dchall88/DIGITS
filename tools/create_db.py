@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import digits.config
 digits.config.load_config()
 from digits import utils, log
+from region_extractors import BoundingBoxExtractor
 
 import numpy as np
 import PIL.Image
@@ -200,6 +201,8 @@ def create_db(input_file, output_dir,
         image_folder    = None,
         shuffle         = True,
         mean_files      = None,
+        get_bboxes=False,
+        scale_factor=None,
         **kwargs):
     """
     Create a database of images from a list of image paths
@@ -217,6 +220,8 @@ def create_db(input_file, output_dir,
     resize_mode -- passed to utils.image.resize_image()
     shuffle -- if True, shuffle the images in the list before creating
     mean_files -- a list of mean files to save
+    get_bboxes -- a flag that indicates whether bounding boxes will be extracted from an image
+    scale_factor -- scale each bounding box by this factor
     """
     ### Validate arguments
 
@@ -253,7 +258,7 @@ def create_db(input_file, output_dir,
     ### Load lines from input_file into a load_queue
 
     load_queue = Queue.Queue()
-    image_count = _fill_load_queue(input_file, load_queue, shuffle)
+    image_count = _fill_load_queue(input_file, load_queue, shuffle, get_bboxes)
 
     # Start some load threads
 
@@ -268,7 +273,7 @@ def create_db(input_file, output_dir,
         p = threading.Thread(target=_load_thread,
                 args=(load_queue, write_queue, summary_queue,
                     image_width, image_height, image_channels,
-                    resize_mode, image_folder, compute_mean)
+                    resize_mode, image_folder, compute_mean, get_bboxes, scale_factor)
                 )
         p.daemon = True
         p.start()
@@ -460,7 +465,8 @@ def _create_hdf5(image_count, write_queue, batch_size, output_dir,
     if compute_mean:
         _save_means(image_sum, images_written, mean_files)
 
-def _fill_load_queue(filename, queue, shuffle):
+
+def _fill_load_queue(filename, queue, shuffle, get_bboxes=False):
     """
     Fill the queue with data from the input file
     Print the category distribution
@@ -480,7 +486,10 @@ def _fill_load_queue(filename, queue, shuffle):
             for line in lines:
                 total_lines += 1
                 try:
-                    result = _parse_line(line, distribution)
+                    if get_bboxes:
+                        result = _parse_bbox_line(line, distribution)
+                    else:
+                        result = _parse_line(line, distribution)
                     valid_lines += 1
                     queue.put(result)
                 except ParseLineError:
@@ -489,7 +498,10 @@ def _fill_load_queue(filename, queue, shuffle):
             for line in infile: # more memory efficient
                 total_lines += 1
                 try:
-                    result = _parse_line(line, distribution)
+                    if get_bboxes:
+                        result = _parse_bbox_line(line, distribution)
+                    else:
+                        result = _parse_line(line, distribution)
                     valid_lines += 1
                     queue.put(result)
                 except ParseLineError:
@@ -505,6 +517,7 @@ def _fill_load_queue(filename, queue, shuffle):
             logger.debug('Type %s: Category %s has %d images.' % (category_type, key, distribution[category_type][key]))
 
     return valid_lines
+
 
 def _parse_line(line, distribution):
     """
@@ -522,15 +535,42 @@ def _parse_line(line, distribution):
     path = match.group(1)
     label = [int(l) for l in match.group(2).split()]
 
+    update_distribution(label, distribution)
+
+    return path, label
+
+
+def _parse_bbox_line(line, distribution):
+    """
+    Parse a line in the input file into (path, label)
+    """
+    line = line.strip()
+    if not line:
+        raise ParseLineError
+
+    # Expect format - /path/to/file.jpg x y w h label_index
+    match = re.match(r'(.+[.]\S+)\s+(\d+(\s\d+){3})\s+(\d+(\s\d*)*)$', line)
+    if match is None:
+        raise ParseLineError
+
+    path = match.group(1)
+    bbox = [int(s) for s in match.group(2).split(' ')]
+    label = [int(l) for l in match.group(4).split()]
+
+    update_distribution(label, distribution)
+
+    return path, bbox, label
+
+
+def update_distribution(label, distribution):
     for category_type, label1 in enumerate(label):
         if category_type not in distribution:
-            distribution[category_type] = Counter()
+            distribution[category_type] = {}
         if label1 not in distribution[category_type]:
             distribution[category_type][label1] = 1
         else:
             distribution[category_type][label1] += 1
 
-    return path, label
 
 def _calculate_batch_size(image_count, is_hdf5=False, hdf5_dset_limit=None,
         image_channels=None, image_height=None, image_width=None):
@@ -555,12 +595,14 @@ def _calculate_num_threads(batch_size, shuffle):
 
 def _load_thread(load_queue, write_queue, summary_queue,
         image_width, image_height, image_channels,
-        resize_mode, image_folder, compute_mean):
+        resize_mode, image_folder, compute_mean, get_bboxes, scale_factor):
     """
     Consumes items in load_queue
     Produces items to write_queue
     Stores cumulative results in summary_queue
     """
+    if get_bboxes:
+        extract_bbox_patches = BoundingBoxExtractor(scale_factor=scale_factor)
     images_added = 0
     if compute_mean:
         image_sum = _initial_image_sum(image_width, image_height, image_channels)
@@ -569,7 +611,10 @@ def _load_thread(load_queue, write_queue, summary_queue,
 
     while not load_queue.empty():
         try:
-            path, label = load_queue.get(True, 0.05)
+            if get_bboxes:
+                path, bbox, label = load_queue.get(True, 0.05)
+            else:
+                path, label = load_queue.get(True, 0.05)
         except Queue.Empty:
             continue
 
@@ -579,6 +624,10 @@ def _load_thread(load_queue, write_queue, summary_queue,
 
         try:
             image = utils.image.load_image(path)
+            if get_bboxes:
+                ## TODO - Make more efficient - currently loads image for each bbox in that image.
+                image = extract_bbox_patches.extract(image, bbox)
+
         except utils.errors.LoadImageError as e:
             logger.warning('[%s] %s: %s' % (path, type(e).__name__, e) )
             continue
@@ -761,6 +810,16 @@ if __name__ == '__main__':
     parser.add_argument('--hdf5_dset_limit',
             type=int,
             help = 'The size limit for HDF5 datasets')
+    parser.add_argument('-bb', '--get_bboxes',
+            type=int,
+            default=0,
+            help='Extract bounding box patches from image'
+            )
+    parser.add_argument('-sf', '--scale_factor',
+            type=float,
+            default=None,
+            help='Scale bounding boxes by this factore'
+            )
 
     args = vars(parser.parse_args())
 
@@ -780,6 +839,8 @@ if __name__ == '__main__':
                 compression     = args['compression'],
                 lmdb_map_size   = args['lmdb_map_size'],
                 hdf5_dset_limit = args['hdf5_dset_limit'],
+                get_bboxes      = args['get_bboxes'],
+                scale_factor    = args['scale_factor'],
                 )
     except Exception as e:
         logger.error('%s: %s' % (type(e).__name__, e.message))

@@ -279,7 +279,6 @@ def from_json(job, form):
 
     parse_json_task = tasks.ParseJsonTask(
             job_dir = job.dir(),
-            job = job,
             json_annotation_file = utils.constants.JSON_FILE,
             train_test_split_file = utils.constants.SPLIT_FILE,
             )
@@ -288,7 +287,9 @@ def from_json(job, form):
 
     ### Add CreateDbTasks
 
+    backend = form.backend.data
     encoding = form.encoding.data
+    compression = form.compression.data
 
     job.tasks.append(
             tasks.CreateDbTask(
@@ -296,12 +297,14 @@ def from_json(job, form):
                 parents     = parse_json_task,
                 input_file  = utils.constants.TRAIN_FILE,
                 db_name     = utils.constants.TRAIN_DB,
+                backend     = backend,
                 image_dims  = job.image_dims,
                 image_folder= root_path,
                 resize_mode = job.resize_mode,
                 mean_file   = utils.constants.MEAN_FILE_CAFFE,
+                encoding    = encoding,
+                compression = compression,
                 labels_file = job.labels_file,
-                encoding      = encoding,
                 get_bboxes  = job.get_bboxes,
                 scale_factor = job.scale_factor,
                 )
@@ -313,11 +316,13 @@ def from_json(job, form):
                 parents     = parse_json_task,
                 input_file  = utils.constants.VAL_FILE,
                 db_name     = utils.constants.VAL_DB,
+                backend     = backend,
                 image_dims  = job.image_dims,
                 image_folder= root_path,
                 resize_mode = job.resize_mode,
                 labels_file = job.labels_file,
                 encoding      = encoding,
+                compression = compression,
                 get_bboxes  = job.get_bboxes,
                 scale_factor = job.scale_factor,
                 shuffle = False,
@@ -330,11 +335,13 @@ def from_json(job, form):
                 parents     = parse_json_task,
                 input_file  = utils.constants.TEST_FILE,
                 db_name     = utils.constants.TEST_DB,
+                backend     = backend,
                 image_dims  = job.image_dims,
                 image_folder= root_path,
                 resize_mode = job.resize_mode,
                 labels_file = job.labels_file,
                 encoding      = encoding,
+                compression = compression,
                 get_bboxes  = job.get_bboxes,
                 scale_factor = job.scale_factor,
                 shuffle = False,
@@ -384,7 +391,9 @@ def image_classification_dataset_create():
                     int(form.resize_width.data),
                     int(form.resize_channels.data),
                     ),
-                resize_mode = form.resize_mode.data
+                resize_mode = form.resize_mode.data,
+                bbox_mode = int(form.bbox_mode.data),
+                scale_factor = float(form.scale_factor.data),
                 )
 
         if form.method.data == 'folder':
@@ -394,7 +403,7 @@ def image_classification_dataset_create():
             from_files(job, form)
 
         elif form.method.data == 'jsonfile':
-                from_json(job, form)
+            from_json(job, form)
 
         else:
             raise ValueError('method not supported')

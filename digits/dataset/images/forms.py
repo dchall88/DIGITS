@@ -52,6 +52,7 @@ class ImageDatasetForm(DatasetForm):
                 ('0', 'No'),
                 ('1', 'Yes'),
                 ],
+            validators=[validate_bounding_box_with_json()],
             tooltip="Extract regions from the image defined by bounding boxes."
             )
 

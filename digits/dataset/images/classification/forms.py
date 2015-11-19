@@ -44,6 +44,7 @@ class ImageClassificationDatasetForm(ImageDatasetForm):
             choices = [
                 ('folder', 'Folder'),
                 ('textfile', 'Textfiles'),
+                ('jsonfile', 'Jsonfiles'),
                 ],
             default='folder',
             )
