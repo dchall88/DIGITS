@@ -22,11 +22,12 @@
             <li><a href="?job_id={{job.id()}}&page=0&size={{size}}&db={{db}}">Show all images</a> or filter by class:</li>
             <li>
                 <ul class="list-unstyled list-inline">
-                {% for type, labels in category_labels.items() %}
-                    <li><h5>{{ type }}</h5></li>
+                {% for type1, labels in category_labels.items() %}
+                    <li><h5>{{ type1 }}</h5></li>
                     {% for l in labels %}
-                        <li><a {% if label==loop.index0 %}class="active"{% endif %} href="?job_id={{job.id()}}&page=0&size={{size}}&db={{db}}&label={{loop.index0}}&type={{type}}">{{l}}</a></li>
+                        <li><a {% if label==loop.index0 and type == type1 %}class="active"{% endif %} href="?job_id={{job.id()}}&page=0&size={{size}}&db={{db}}&label={{loop.index0}}&type={{type1}}">{{l}}</a></li>
                     {% endfor %}
+                    </br>
                 {% endfor %}
                 </ul>
             </li>
