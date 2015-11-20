@@ -9,6 +9,13 @@ import re
 from digits.utils.routing import get_request_arg
 
 
+def validate_prob_layer_for_experiment():
+    def _validator(form, field):
+        if 'prob' not in field.data:
+            raise validators.ValidationError('You must select the prob layer')
+    return _validator
+
+
 def validate_bounding_box_with_json():
     def _validator(form, field):
         if form.method.data != 'jsonfile' and field.data == '1':

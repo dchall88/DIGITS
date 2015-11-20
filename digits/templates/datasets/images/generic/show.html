@@ -36,6 +36,11 @@
 </div>
 {% endmacro %}
 
+{% block nav %}
+<li><a href="{{ url_for('home')}}">Datasets</a></li>
+{{ super() }}
+{% endblock %}
+
 {% block job_content %}
 
 <div class="row">

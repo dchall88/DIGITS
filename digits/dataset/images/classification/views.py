@@ -517,7 +517,8 @@ def image_classification_dataset_explore():
     if label is None:
         total_entries = reader.total_entries
     else:
-        total_entries = task.distribution[0][label]
+        index = category_labels.keys().index(category_type)
+        total_entries = task.distribution[index][label]
 
     max_page = min((total_entries-1) / size, page + 5)
     pages = range(min_page, max_page + 1)

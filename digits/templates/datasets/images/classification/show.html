@@ -70,7 +70,49 @@
     </dl>
 </div>
 {% endmacro %}
+{% macro print_parse_json_task(task) %}
+<div class="panel-heading">
+    <h4>{{task.name()}}</h4>
+</div>
+<div class="panel-body">
+    <dl>
+        <dt>Annotation File</dt>
+        <dd><a href="{{url_for('serve_file', path=task.path(task.json_file, relative=True))}}">{{task.json_file}}</a></dd>
+        <dt>Train/Val/Test Split</dt>
+        <dd><a href="{{url_for('serve_file', path=task.path(task.train_test_split_file, relative=True))}}">{{task.train_test_split_file}}</a></dd>
+    </dl>
+    <dl>
+        {% if task.train_count %}
+        <dt>Training images</dt>
+        <dd>{{task.train_count}}</dd>
+        {% endif %}
+        {% if task.val_count %}
+        <dt>Validation images</dt>
+        <dd>
+        {{task.val_count}}
+        </dd>
+        {% endif %}
+        {% if task.test_count %}
+        <dt>Test images</dt>
+        <dd>
+        {{task.test_count}}
+        {% endif %}
+        {% if job.labels %}
+        <dt>Categories and Class Labels</dt>
 
+        <dd>
+
+        {% for category in job.labels.keys() %}
+        <dt>&nbsp{{category}}</dt>
+        <dd>&nbsp&nbsp{{', '.join(job.labels[category])}}</dd>
+        {% endfor %}
+
+        </dd>
+
+        {% endif %}
+    </dl>
+</div>
+{% endmacro %}
 {% macro print_create_db_task(task) %}
 <div class="panel-heading">
     <h4>{{task.name()}}</h4>
@@ -152,8 +194,22 @@
         }));
     }
 </script>
+{% if job.parse_json_tasks()|length == 1 %}
+{% set task = job.parse_json_tasks()[0] %}
+<div class="row">
+    <div class="col-sm-6">
+        <div id="job-information" class="panel panel-default">
+            {{ print_job_information() }}
+        </div>
+    </div>
+    <div class="col-sm-6">
+        <div id="{{task.html_id()}}" class="panel panel-default">
+            {{ print_parse_json_task(task) }}
+        </div>
+    </div>
+</div>
 
-{% if job.parse_folder_tasks()|length == 1 %}
+{% elif job.parse_folder_tasks()|length == 1 %}
 {% set task = job.parse_folder_tasks()[0] %}
 <div class="row">
     <div class="col-sm-6">

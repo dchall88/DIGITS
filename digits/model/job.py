@@ -13,7 +13,7 @@ class ModelJob(Job):
     A Job that creates a neural network model
     """
 
-    def __init__(self, dataset_id, category_label, **kwargs):
+    def __init__(self, dataset_id, category_label=None, **kwargs):
         """
         Arguments:
         dataset_id -- the job_id of the DatasetJob that this ModelJob depends on

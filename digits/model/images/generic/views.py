@@ -24,14 +24,14 @@ from digits.utils import filesystem as fs
 
 NAMESPACE   = '/models/images/generic'
 
-@app.route(NAMESPACE + '/new', methods=['GET'])
+@app.route(NAMESPACE + '/<dataset_id>/new', methods=['GET'])
 @autodoc('models')
-def generic_image_model_new():
+def generic_image_model_new(dataset_id):
     """
     Return a form for a new GenericImageModelJob
     """
     form = GenericImageModelForm()
-    form.dataset.choices = get_datasets()
+    dataset_name = get_dataset_name(dataset_id)
     form.standard_networks.choices = []
     form.previous_networks.choices = get_previous_networks()
 
@@ -42,6 +42,8 @@ def generic_image_model_new():
 
     return flask.render_template('models/images/generic/new.html',
             form = form,
+            dataset_id=dataset_id,
+            dataset_name=dataset_name,
             frameworks = frameworks.get_frameworks(),
             previous_network_snapshots = prev_network_snapshots,
             previous_networks_fullinfo = get_previous_networks_fulldetails(),
@@ -49,16 +51,16 @@ def generic_image_model_new():
             )
 
 @app.route(NAMESPACE + '.json', methods=['POST'])
-@app.route(NAMESPACE, methods=['POST'])
+@app.route(NAMESPACE + '/<dataset_id>/', methods=['POST'])
 @autodoc(['models', 'api'])
-def generic_image_model_create():
+def generic_image_model_create(dataset_id):
     """
     Create a new GenericImageModelJob
 
     Returns JSON when requested: {job_id,name,status} or {errors:[]}
     """
     form = GenericImageModelForm()
-    form.dataset.choices = get_datasets()
+    dataset_name = get_dataset_name(dataset_id)
     form.standard_networks.choices = []
     form.previous_networks.choices = get_previous_networks()
 
@@ -73,22 +75,19 @@ def generic_image_model_create():
         else:
             return flask.render_template('models/images/generic/new.html',
                     form = form,
+                    dataset_id=dataset_id,
+                    dataset_name=dataset_name,
                     frameworks = frameworks.get_frameworks(),
                     previous_network_snapshots = prev_network_snapshots,
                     previous_networks_fullinfo = get_previous_networks_fulldetails(),
                     multi_gpu = config_value('caffe_root')['multi_gpu'],
                     ), 400
 
-    datasetJob = scheduler.get_job(form.dataset.data)
-    if not datasetJob:
-        raise werkzeug.exceptions.BadRequest(
-                'Unknown dataset job_id "%s"' % form.dataset.data)
-
     job = None
     try:
         job = GenericImageModelJob(
                 name        = form.model_name.data,
-                dataset_id  = datasetJob.id(),
+                dataset_id  = dataset_id,
                 )
 
         # get framework (hard-coded to caffe for now)
@@ -181,7 +180,7 @@ def generic_image_model_create():
 
         job.tasks.append(fw.create_train_task(
                     job_dir         = job.dir(),
-                    dataset         = datasetJob,
+                    dataset         = job.dataset,
                     train_epochs    = form.train_epochs.data,
                     snapshot_interval   = form.snapshot_interval.data,
                     learning_rate   = form.learning_rate.data,
@@ -350,12 +349,10 @@ def generic_image_model_infer_many():
                 network_outputs = outputs,
                 )
 
-def get_datasets():
-    return [(j.id(), j.name()) for j in sorted(
-        [j for j in scheduler.jobs if isinstance(j, GenericImageDatasetJob) and (j.status.is_running() or j.status == Status.DONE)],
-        cmp=lambda x,y: cmp(y.id(), x.id())
-        )
-        ]
+def get_dataset_name(job_id):
+    for j in scheduler.jobs:
+        if j.id() == job_id:
+            return j.name()
 
 def get_previous_networks():
     return [(j.id(), j.name()) for j in sorted(
@@ -381,4 +378,3 @@ def get_previous_network_snapshots():
             e.insert(0, (-1, 'Previous pretrained model'))
         prev_network_snapshots.append(e)
     return prev_network_snapshots
-

@@ -11,104 +11,22 @@ New Image Model
 {% endblock %}
 
 {% block nav %}
-<li class="active"><a href="{{url_for('generic_image_model_new')}}">New Model</a></li>
+<li><a href="{{ url_for('home')}}">Datasets</a></li>
+<li><a href="{{ url_for('home', dataset_id=dataset_id)}}">Models</a></li>
+<li class="active"><a href="{{url_for('generic_image_model_new', dataset_id=dataset_id)}}">New Model</a></li>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h1>New Image Model</h1>
+    <h1>New Generic Model <a class="btn btn-lg btn-info pull-right" href="{{ url_for('show_job', job_id=dataset_id) }}">Dataset - {{dataset_name}}</a></h1>
+
+
 </div>
 
-<form id="model-form" action="{{url_for('generic_image_model_create')}}" enctype="multipart/form-data" method="post">
+<form id="model-form" action="{{url_for('generic_image_model_create', dataset_id=dataset_id)}}" enctype="multipart/form-data" method="post">
     {{ form.hidden_tag() }}
 
     {{ print_errors(form) }}
-
-    <div class="row">
-        <div class="col-sm-4">
-            <div class="well">
-                <div class="form-group{{mark_errors([form.dataset])}}">
-                    {{form.dataset.label}}
-                    {{form.dataset.tooltip}}
-                    {{form.dataset(class='form-control', size=5)}}
-                </div>
-            </div>
-            <div class="col">
-                <div class="well">
-                    <label for="{{form.python_layer_from_client.name}}">
-                        {{form.python_layer_from_client}}
-                        {{form.python_layer_from_client.label}}
-                    </label>
-                    <div class="form-group{{' has-error' if form.python_layer_client_file.errors}} python-layer-client-side-file">
-                        {{form.python_layer_client_file.label}}
-                        {{form.python_layer_client_file.tooltip}}
-                        {{form.python_layer_client_file(class='form-control')}}
-                    </div>
-                    <div class="form-group{{' has-error' if form.python_layer_server_file.errors}} python-layer-server-side-file">
-                        {{form.python_layer_server_file.label}}
-                        {{form.python_layer_server_file.tooltip}}
-                        {{form.python_layer_server_file(class='form-control autocomplete_path')}}
-                    </div>
-                </div>
-            </div>
-        </div>
-        <script>
-
-         // Show/home python_layer_file form fields according to the checkbox
-         function python_layer_file_state() {
-             var from_client = $("#python_layer_from_client").prop("checked");
-             if (from_client) {
-                 $(".python-layer-server-side-file").hide();
-                 $(".python-layer-client-side-file").show();
-             }
-             else{
-                 $(".python-layer-server-side-file").show();
-                 $(".python-layer-client-side-file").hide();
-             }
-         }
-
-         $("#python_layer_from_client").click(function() {
-             python_layer_file_state();
-         });
-         python_layer_file_state();
-
-$("#dataset").change(function() {
-        $.ajax("/datasets/images/generic/summary?job_id=" + $(this).val(),
-            {
-                type: "GET",
-                }
-            )
-        .done(function(data) {
-            $("#dataset-summary").html(data);
-            })
-        .fail(function(data) {
-            $("#dataset-summary").html("");
-            errorAlert(data);
-            });
-        });
-        </script>
-        <div class="col-sm-4">
-            <div id="dataset-summary">
-            </div>
-        </div>
-        <div class="col-sm-4">
-            <div class="well">
-                <h4>Data Transformations</h4>
-                <div class="form-group{{mark_errors([form.crop_size])}}">
-                    {{form.crop_size.label}}
-                    {{form.crop_size.tooltip}}
-                    {{form.crop_size(class='form-control', placeholder='none')}}
-                </div>
-                <div class="form-group{{mark_errors([form.use_mean])}}">
-                    {{form.use_mean.label}}
-                    {{form.use_mean.tooltip}}
-                    {{form.use_mean(class='form-control')}}
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <hr>
 
     <div class="row">
         <div class="col-sm-4">
@@ -574,8 +492,82 @@ $('#network-tabs a[href="#network-tab-'+$("#method").val()+'"]').tab('show');
         </div>
     </div>
 
+</hr>
+
     <div class="row">
-        <div class="col-sm-6 col-sm-offset-3 well">
+        <div class="col-sm-4">
+            <div class="col">
+                <div class="well">
+                    <label for="{{form.python_layer_from_client.name}}">
+                        {{form.python_layer_from_client}}
+                        {{form.python_layer_from_client.label}}
+                    </label>
+                    <div class="form-group{{' has-error' if form.python_layer_client_file.errors}} python-layer-client-side-file">
+                        {{form.python_layer_client_file.label}}
+                        {{form.python_layer_client_file.tooltip}}
+                        {{form.python_layer_client_file(class='form-control')}}
+                    </div>
+                    <div class="form-group{{' has-error' if form.python_layer_server_file.errors}} python-layer-server-side-file">
+                        {{form.python_layer_server_file.label}}
+                        {{form.python_layer_server_file.tooltip}}
+                        {{form.python_layer_server_file(class='form-control autocomplete_path')}}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+
+         // Show/home python_layer_file form fields according to the checkbox
+         function python_layer_file_state() {
+             var from_client = $("#python_layer_from_client").prop("checked");
+             if (from_client) {
+                 $(".python-layer-server-side-file").hide();
+                 $(".python-layer-client-side-file").show();
+             }
+             else{
+                 $(".python-layer-server-side-file").show();
+                 $(".python-layer-client-side-file").hide();
+             }
+         }
+
+         $("#python_layer_from_client").click(function() {
+             python_layer_file_state();
+         });
+         python_layer_file_state();
+
+$("#dataset").change(function() {
+        $.ajax("/datasets/images/generic/summary?job_id=" + $(this).val(),
+            {
+                type: "GET",
+                }
+            )
+        .done(function(data) {
+            $("#dataset-summary").html(data);
+            })
+        .fail(function(data) {
+            $("#dataset-summary").html("");
+            errorAlert(data);
+            });
+        });
+        </script>
+
+        <div class="col-sm-4">
+            <div class="well">
+                <h4>Data Transformations</h4>
+                <div class="form-group{{mark_errors([form.crop_size])}}">
+                    {{form.crop_size.label}}
+                    {{form.crop_size.tooltip}}
+                    {{form.crop_size(class='form-control', placeholder='none')}}
+                </div>
+                <div class="form-group{{mark_errors([form.use_mean])}}">
+                    {{form.use_mean.label}}
+                    {{form.use_mean.tooltip}}
+                    {{form.use_mean(class='form-control')}}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-4 well">
             {% if form.select_gpu.choices|length > 2 and not multi_gpu %}
             <div class="form-group{{mark_errors([form.select_gpu])}}">
                 <b>{{form.select_gpu.label.text}}</b><br>

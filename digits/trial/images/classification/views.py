@@ -166,7 +166,7 @@ def get_learning_methods():
     return [
             ('dnn', 'Deep Neural Net'),
             ('svm', 'SVM'),
-            ('adaboost', 'AdaBoost'),
+            #('adaboost', 'AdaBoost'),
             ]
 
 

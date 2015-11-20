@@ -24,7 +24,7 @@ from digits.log import logger
 
 @app.route('/index.json', methods=['GET'])
 @app.route('/', methods=['GET'])
-@app.route('/model/<dataset_id>', methods=['GET'])
+@app.route('/models_home/<dataset_id>', methods=['GET'])
 @autodoc(['home', 'api'])
 def home(dataset_id=None):
     """
@@ -41,26 +41,26 @@ def home(dataset_id=None):
     # Dataset Job
     if dataset_id is None:
         job_type = dataset.DatasetJob
+        name = 'Dataset'
     # Model Job
     else:
         job_type = model.ModelJob
+        name = 'Model'
 
     running_jobs = get_job_list(job_type, True, dataset_id)
     completed_jobs = get_job_list(job_type, False, dataset_id)
 
     if request_wants_json():
-        pass
-        # data = {
-        #         'version': digits.__version__,
-        #         'jobs_dir': config_value('jobs_dir'),
-        #         'datasets': [j.json_dict()
-        #             for j in running_datasets + completed_datasets],
-        #         'models': [j.json_dict()
-        #             for j in running_models + completed_models],
-        #         }
-        # if config_value('server_name'):
-        #     data['server_name'] = config_value('server_name')
-        # return flask.jsonify(data)
+        data = {
+                'version': digits.__version__,
+                'jobs_dir': config_value('jobs_dir'),
+                'job_type': name,
+                'jobs': [j.json_dict()
+                    for j in running_jobs + completed_jobs],
+                }
+        if config_value('server_name'):
+            data['server_name'] = config_value('server_name')
+        return flask.jsonify(data)
     else:
         if dataset_id is None:
             name = 'Dataset'
@@ -80,22 +80,27 @@ def home(dataset_id=None):
                         ])
                     ]
         else:
-            name = 'Model'
-            dataset_name = get_dataset_name(dataset_id)
-            options = [
-                    ('New Model', [
-                        {
-                            'title': 'Classification',
-                            'id': 'classification',
-                            'url': flask.url_for('image_classification_model_new', dataset_id=dataset_id),
-                            },
-                        {
-                            'title': 'Generic',
-                            'id': 'generic-classification',
-                            'url': flask.url_for('generic_image_model_new', dataset_id=dataset_id),
-                            },
-                        ])
-                    ]
+            dataset_name, dataset_type = get_dataset_name(dataset_id)
+            if dataset_type == 'Image Classification Dataset':
+                options = [
+                        ('New Model', [
+                            {
+                                'title': 'Classification',
+                                'id': 'classification',
+                                'url': flask.url_for('image_classification_model_new', dataset_id=dataset_id),
+                                },
+                            ])
+                        ]
+            elif dataset_type == 'Generic Image Dataset':
+                options = [
+                        ('New Model', [
+                            {
+                                'title': 'Generic',
+                                'id': 'generic-classification',
+                                'url': flask.url_for('generic_image_model_new', dataset_id=dataset_id),
+                                },
+                            ])
+                        ]
 
         return flask.render_template(
             'home.html',
@@ -135,7 +140,7 @@ def get_experiment_job(cls, model_id):
 def get_dataset_name(job_id):
     for j in scheduler.jobs:
         if isinstance(j, dataset.DatasetJob) and j.id() == job_id:
-            return j.name()
+            return j.name(), j.job_type()
 
 @app.route('/experiment/<dataset_id>/<model_id>')
 def home_experiment(dataset_id, model_id):
@@ -287,9 +292,9 @@ def clone_job(clone):
     if isinstance(job, dataset.GenericImageDatasetJob):
         return flask.redirect(flask.url_for('generic_image_dataset_new') + '?clone=' + clone)
     if isinstance(job, model.ImageClassificationModelJob):
-        return flask.redirect(flask.url_for('image_classification_model_new') + '?clone=' + clone)
+        return flask.redirect(flask.url_for('image_classification_model_new', dataset_id=job.dataset_id) + '?clone=' + clone)
     if isinstance(job, model.GenericImageModelJob):
-        return flask.redirect(flask.url_for('generic_image_model_new') + '?clone=' + clone)
+        return flask.redirect(flask.url_for('generic_image_model_new', dataset_id=job.dataset_id) + '?clone=' + clone)
     else:
         raise werkzeug.exceptions.BadRequest('Invalid job type')
 

@@ -68,13 +68,6 @@ class ModelForm(Form):
     #             tooltip = "Choose the dataset to use for this model."
     #         )
 
-    category_names = utils.forms.SelectField('Select Category Name',
-                                             default=-1,
-                                             choices=[],
-                                             coerce=int,
-                                             validators=[validators.InputRequired()],
-                                             tooltip="Choose the category label you would like to use to train the model.")
-
 
     python_layer_from_client = wtforms.BooleanField(u'Use client side file',
                                                 default=False)

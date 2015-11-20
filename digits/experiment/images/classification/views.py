@@ -1,28 +1,15 @@
 # Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
-
 import os
-import re
-import sys
-import shutil
-import tempfile
-import random
-import copy
 import io
 import tarfile
 import zipfile
 
-import numpy as np
-from flask import render_template, request, redirect, url_for, flash
-
 import flask
 import werkzeug.exceptions
 
-import digits
-from digits.config import config_value
 from digits import utils
 from digits.webapp import app, scheduler, autodoc
-from digits.dataset import ImageClassificationDatasetJob
-from digits.model import ImageClassificationModelJob
+from digits.utils.routing import request_wants_json, job_from_request
 from digits.trial import ImageClassificationTrialJob
 from digits.experiment import tasks
 from forms import ImageClassificationExperimentForm
@@ -39,7 +26,7 @@ def image_classification_experiment_new(dataset_id, model_id):
     form.model_snapshots.choices = get_model_snapshots(model)
     form.model_layers.choices = get_model_layers(model)
 
-    return render_template('experiments/images/classification/new.html', form=form, dataset=dataset, model=model)
+    return flask.render_template('experiments/images/classification/new.html', form=form, dataset=dataset, model=model)
 
 @app.route(NAMESPACE  + '/<dataset_id>/<model_id>/', methods=['POST'])
 def image_classification_experiment_create(dataset_id, model_id):
@@ -50,7 +37,7 @@ def image_classification_experiment_create(dataset_id, model_id):
     form.model_layers.choices = get_model_layers(model)
 
     if not form.validate_on_submit():
-        return render_template('experiments/images/classification/new.html', form=form, dataset=dataset, model=model), 400
+        return flask.render_template('experiments/images/classification/new.html', form=form, dataset=dataset, model=model), 400
 
     num_test_examples = dataset.test_db_task().entries_count
     num_train_examples = dataset.train_db_task().entries_count
@@ -115,9 +102,8 @@ def image_classification_experiment_create(dataset_id, model_id):
                                       )
         )
 
-
         scheduler.add_job(job)
-        return redirect(url_for('experiments_show', job_id=job.id()))
+        return flask.redirect(flask.url_for('experiments_show', job_id=job.id()))
 
     except:
         if job:
@@ -135,7 +121,7 @@ def image_classification_experiment_add_layers(experiment_id):
     form.model_snapshots.choices = get_model_snapshots(model)
     form.model_layers.choices = get_more_model_layers(model, experiment)
 
-    return render_template('experiments/images/classification/more.html', form=form, experiment=experiment, dataset=dataset, model=model)
+    return flask.render_template('experiments/images/classification/more.html', form=form, experiment=experiment, dataset=dataset, model=model)
 
 
 @app.route(NAMESPACE  + '/<experiment_id>/', methods=['POST'])
@@ -151,7 +137,7 @@ def image_classification_experiment_add_layers_create(experiment_id):
     form.model_layers.choices = get_more_model_layers(model, job)
 
     if not form.validate_on_submit():
-        return render_template('experiments/images/classification/more.html', form=form, experiment=job, dataset=dataset, model=model), 400
+        return flask.render_template('experiments/images/classification/more.html', form=form, experiment=job, dataset=dataset, model=model), 400
 
     num_test_examples = dataset.test_db_task().entries_count
     num_train_examples = dataset.train_db_task().entries_count
@@ -209,7 +195,7 @@ def image_classification_experiment_add_layers_create(experiment_id):
         )
 
         job.status = Status.WAIT
-        return redirect(url_for('experiments_show', job_id=job.id()))
+        return flask.redirect(flask.url_for('experiments_show', job_id=job.id()))
 
     except:
         if job:
@@ -257,7 +243,7 @@ def show(job):
     """
     running_trials = get_trial_list(job.id(), True),
     completed_trials = get_trial_list(job.id(), False),
-    return render_template('experiments/images/classification/show.html',
+    return flask.render_template('experiments/images/classification/show.html',
                            job=job,
                            running_trials=running_trials,
                            completed_trials=completed_trials,)

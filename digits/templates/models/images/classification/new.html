@@ -618,21 +618,6 @@ $('#network-tabs a[href="#network-tab-'+$("#method").val()+'"]').tab('show');
              python_layer_file_state();
          });
          python_layer_file_state();
-
-$("#dataset").change(function() {
-        $.ajax("/datasets/images/classification/summary?job_id=" + $(this).val(),
-            {
-                type: "GET",
-                }
-            )
-        .done(function(data) {
-            $("#dataset-summary").html(data);
-            })
-        .fail(function(data) {
-            $("#dataset-summary").html("");
-            errorAlert(data);
-            });
-        });
         </script>
         <div class="col-sm-4">
             <div class="well">
@@ -650,7 +635,6 @@ $("#dataset").change(function() {
             </div>
         </div>
         <div class="col-sm-4 well">
-            <div id="dataset-summary">
                 {% if form.select_gpu.choices|length > 2 and not multi_gpu %}
                     <div class="form-group{{mark_errors([form.select_gpu])}}">
                         <b>{{form.select_gpu.label.text}}</b><br>
@@ -687,7 +671,6 @@ $("#dataset").change(function() {
                     {{form.model_name(class='form-control')}}
                 </div>
                 <input type="submit" name="create-model" class="btn btn-primary" value="Create">
-            </div>
         </div>
     </div>
 </form>

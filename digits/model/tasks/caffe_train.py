@@ -44,7 +44,7 @@ class CaffeTrainTask(TrainTask):
         #TODO
         pass
 
-    def __init__(self, category_index, **kwargs):
+    def __init__(self, category_index=None, **kwargs):
         """
         Arguments:
         network -- a caffe NetParameter defining the network
@@ -54,8 +54,9 @@ class CaffeTrainTask(TrainTask):
 
         self.layers = self.get_layers()
         self.category_index = category_index
-        self.labels = self.dataset.get_labels()
-        self.category_name = self.labels.keys()[self.category_index]
+        if isinstance(self.dataset, dataset.ImageClassificationDatasetJob):
+            self.labels = self.dataset.get_labels()
+            self.category_name = self.labels.keys()[self.category_index]
 
         self.current_iteration = 0
 

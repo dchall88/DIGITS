@@ -28,11 +28,11 @@ from digits import frameworks
 
 NAMESPACE = '/models/'
 
-@app.route(NAMESPACE, methods=['GET'])
+@app.route(NAMESPACE + 'summary/<dataset_id>/', methods=['GET'])
 @autodoc(['models'])
-def models_index():
+def models_index(dataset_id):
     column_attrs = list(get_column_attrs())
-    raw_jobs = [j for j in scheduler.jobs if isinstance(j, ModelJob)]
+    raw_jobs = [j for j in scheduler.jobs if isinstance(j, ModelJob) and j.dataset_id == dataset_id]
 
     column_types = [
         ColumnType('latest', False, lambda outs: outs[-1]),
@@ -82,7 +82,8 @@ def models_index():
 
     return flask.render_template('models/index.html',
         jobs=jobs,
-        attrs_and_labels=attrs_and_labels)
+        attrs_and_labels=attrs_and_labels,
+        dataset_id=dataset_id)
 
 @app.route(NAMESPACE + '<job_id>.json', methods=['GET'])
 @app.route(NAMESPACE + '<job_id>', methods=['GET'])

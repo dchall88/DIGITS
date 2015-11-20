@@ -15,6 +15,12 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/fixedHeader.bootstrap.min.css') }}">
 {% endblock %}
 
+{% block nav %}
+    <li><a href="{{ url_for('home')}}">Datasets</a></li>
+    <li><a href="{{ url_for('home', dataset_id=dataset_id)}}">Models</a></li>
+    <li class="active"><a href="{{ url_for('models_index', dataset_id=dataset_id)}}">Summary</a></li>
+{% endblock %}
+
 {% block content %}
 
 <div class="page-header">

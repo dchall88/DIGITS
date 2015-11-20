@@ -70,7 +70,11 @@ function deleteJob(job_id) {
     </ul>
 </div>
 
-<h2>{{name}}s</h2>
+<h2>{{name}}s
+    {% if name == 'Model' %}
+        <small><a href="{{ url_for('models_index', dataset_id=dataset_id) }}">View details</a></small>
+    {% endif %}
+</h2>
 
 <div class="tab-content">
     {% for batch in completed_jobs|batch(10) %}

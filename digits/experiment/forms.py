@@ -5,6 +5,7 @@ import os
 from flask.ext.wtf import Form
 from digits import utils
 from wtforms import validators
+from digits.utils.forms import validate_prob_layer_for_experiment
 
 class ExperimentForm(Form):
 
@@ -17,5 +18,5 @@ class ExperimentForm(Form):
                 validators = [validators.Optional()]
                 )
 
-    model_layers = utils.forms.SelectMultipleField('Select Layers', choices=[], validators=[validators.DataRequired()])
+    model_layers = utils.forms.SelectMultipleField('Select Layers', choices=[], validators=[validators.DataRequired(), validate_prob_layer_for_experiment()])
 
