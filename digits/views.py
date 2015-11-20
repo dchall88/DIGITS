@@ -4,12 +4,10 @@ import json
 import traceback
 import glob
 import platform
-
 import flask
 from werkzeug import HTTP_STATUS_CODES
 import werkzeug.exceptions
 from flask.ext.socketio import join_room, leave_room
-
 import digits
 from . import dataset, model
 from config import config_value
@@ -21,6 +19,7 @@ import trial.views
 from digits.utils import errors
 from digits.utils.routing import request_wants_json
 from digits.log import logger
+
 
 @app.route('/index.json', methods=['GET'])
 @app.route('/', methods=['GET'])
@@ -52,12 +51,12 @@ def home(dataset_id=None):
 
     if request_wants_json():
         data = {
-                'version': digits.__version__,
-                'jobs_dir': config_value('jobs_dir'),
-                'job_type': name,
-                'jobs': [j.json_dict()
-                    for j in running_jobs + completed_jobs],
-                }
+            'version': digits.__version__,
+            'jobs_dir': config_value('jobs_dir'),
+            'job_type': name,
+            'jobs': [j.json_dict()
+                     for j in running_jobs + completed_jobs],
+        }
         if config_value('server_name'):
             data['server_name'] = config_value('server_name')
         return flask.jsonify(data)
@@ -66,41 +65,41 @@ def home(dataset_id=None):
             name = 'Dataset'
             dataset_name = None
             options = [
-                    ('New Dataset', [
-                        {
-                            'title': 'Images',
-                            'id': 'images',
-                            'url': flask.url_for('image_classification_dataset_new'),
-                            },
-                        {
-                            'title': 'Generic',
-                            'id': 'generic',
-                            'url': flask.url_for('generic_image_dataset_new'),
-                            },
-                        ])
-                    ]
+                ('New Dataset', [
+                    {
+                        'title': 'Images',
+                        'id': 'images',
+                        'url': flask.url_for('image_classification_dataset_new'),
+                    },
+                    {
+                        'title': 'Generic',
+                        'id': 'generic',
+                        'url': flask.url_for('generic_image_dataset_new'),
+                    },
+                ])
+            ]
         else:
             dataset_name, dataset_type = get_dataset_name(dataset_id)
             if dataset_type == 'Image Classification Dataset':
                 options = [
-                        ('New Model', [
-                            {
-                                'title': 'Classification',
-                                'id': 'classification',
-                                'url': flask.url_for('image_classification_model_new', dataset_id=dataset_id),
-                                },
-                            ])
-                        ]
+                    ('New Model', [
+                        {
+                            'title': 'Classification',
+                            'id': 'classification',
+                            'url': flask.url_for('image_classification_model_new', dataset_id=dataset_id),
+                        },
+                    ])
+                ]
             elif dataset_type == 'Generic Image Dataset':
                 options = [
-                        ('New Model', [
-                            {
-                                'title': 'Generic',
-                                'id': 'generic-classification',
-                                'url': flask.url_for('generic_image_model_new', dataset_id=dataset_id),
-                                },
-                            ])
-                        ]
+                    ('New Model', [
+                        {
+                            'title': 'Generic',
+                            'id': 'generic-classification',
+                            'url': flask.url_for('generic_image_model_new', dataset_id=dataset_id),
+                        },
+                    ])
+                ]
 
         return flask.render_template(
             'home.html',
@@ -112,22 +111,23 @@ def home(dataset_id=None):
             completed_jobs=completed_jobs,
             total_gpu_count=len(scheduler.resources['gpus']),
             remaining_gpu_count=sum(r.remaining() for r in scheduler.resources['gpus']),
-            )
+        )
 
 
 def get_job_list(cls, running, dataset_id=None):
     if dataset_id:
-            return sorted(
-            [j for j in scheduler.jobs if isinstance(j, cls) and j.status.is_running() == running and (j.dataset_id == dataset_id)],
+        return sorted(
+            [j for j in scheduler.jobs if
+             isinstance(j, cls) and j.status.is_running() == running and (j.dataset_id == dataset_id)],
             key=lambda j: j.status_history[0][1],
             reverse=True,
-            )
+        )
     else:
         return sorted(
-                [j for j in scheduler.jobs if isinstance(j, cls) and j.status.is_running() == running],
-                key=lambda j: j.status_history[0][1],
-                reverse=True,
-                )
+            [j for j in scheduler.jobs if isinstance(j, cls) and j.status.is_running() == running],
+            key=lambda j: j.status_history[0][1],
+            reverse=True,
+        )
 
 
 def get_experiment_job(cls, model_id):
@@ -142,15 +142,17 @@ def get_dataset_name(job_id):
         if isinstance(j, dataset.DatasetJob) and j.id() == job_id:
             return j.name(), j.job_type()
 
+
 @app.route('/experiment/<dataset_id>/<model_id>')
 def home_experiment(dataset_id, model_id):
-
     job = get_experiment_job(experiment.ExperimentJob, model_id)
 
     if job is None:
-        return flask.redirect(flask.url_for('image_classification_experiment_new', dataset_id=dataset_id, model_id=model_id))
+        return flask.redirect(
+            flask.url_for('image_classification_experiment_new', dataset_id=dataset_id, model_id=model_id))
     else:
         return flask.redirect(flask.url_for('show_job', job_id=job.id()))
+
 
 ### Jobs routes
 
@@ -174,6 +176,7 @@ def show_job(job_id):
         return flask.redirect(flask.url_for('trials_show', job_id=job_id))
     else:
         raise werkzeug.exceptions.BadRequest('Invalid job type')
+
 
 @app.route('/jobs/<job_id>', methods=['PUT'])
 @autodoc('jobs')
@@ -203,6 +206,7 @@ def edit_job(job_id):
 
     return '%s updated.' % job.job_type()
 
+
 @app.route('/datasets/<job_id>/status', methods=['GET'])
 @app.route('/models/<job_id>/status', methods=['GET'])
 @app.route('/jobs/<job_id>/status', methods=['GET'])
@@ -222,6 +226,7 @@ def job_status(job_id):
         result['type'] = job.job_type()
     return json.dumps(result)
 
+
 @app.route('/job_management', methods=['GET'])
 @autodoc('util')
 def job_management():
@@ -230,12 +235,13 @@ def job_management():
 
     """
 
-    running_datasets    = get_job_list(dataset.DatasetJob, True)
-    running_models      = get_job_list(model.ModelJob, True)
+    running_datasets = get_job_list(dataset.DatasetJob, True)
+    running_models = get_job_list(model.ModelJob, True)
 
     return flask.render_template('job_management.html',
-                                 running_job = running_datasets + running_models,
-                             )
+                                 running_job=running_datasets + running_models,
+                                 )
+
 
 @app.route('/datasets/<job_id>', methods=['DELETE'])
 @app.route('/models/<job_id>', methods=['DELETE'])
@@ -257,6 +263,7 @@ def delete_job(job_id):
     except errors.DeleteError as e:
         raise werkzeug.exceptions.Forbidden(str(e))
 
+
 @app.route('/datasets/<job_id>/abort', methods=['POST'])
 @app.route('/models/<job_id>/abort', methods=['POST'])
 @app.route('/jobs/<job_id>/abort', methods=['POST'])
@@ -273,6 +280,7 @@ def abort_job(job_id):
         return 'Job aborted.'
     else:
         raise werkzeug.exceptions.Forbidden('Job not aborted')
+
 
 @app.route('/clone/<clone>', methods=['POST', 'GET'])
 @autodoc('jobs')
@@ -292,11 +300,13 @@ def clone_job(clone):
     if isinstance(job, dataset.GenericImageDatasetJob):
         return flask.redirect(flask.url_for('generic_image_dataset_new') + '?clone=' + clone)
     if isinstance(job, model.ImageClassificationModelJob):
-        return flask.redirect(flask.url_for('image_classification_model_new', dataset_id=job.dataset_id) + '?clone=' + clone)
+        return flask.redirect(
+            flask.url_for('image_classification_model_new', dataset_id=job.dataset_id) + '?clone=' + clone)
     if isinstance(job, model.GenericImageModelJob):
         return flask.redirect(flask.url_for('generic_image_model_new', dataset_id=job.dataset_id) + '?clone=' + clone)
     else:
         raise werkzeug.exceptions.BadRequest('Invalid job type')
+
 
 ### Error handling
 
@@ -318,9 +328,9 @@ def handle_error(e):
 
     if request_wants_json():
         details = {
-                'message': message,
-                'type': error_type,
-                }
+            'message': message,
+            'type': error_type,
+        }
         if description is not None:
             details['description'] = description
         if trace is not None:
@@ -328,17 +338,19 @@ def handle_error(e):
         return flask.jsonify({'error': details}), status_code
     else:
         return flask.render_template('error.html',
-                title       = error_type,
-                message     = message,
-                description = description,
-                trace       = trace,
-                ), status_code
+                                     title=error_type,
+                                     message=message,
+                                     description=description,
+                                     trace=trace,
+                                     ), status_code
+
 
 # Register this handler for all error codes
 # Necessary for flask<=0.10.1
 for code in HTTP_STATUS_CODES:
     if code not in [301]:
         app.register_error_handler(code, handle_error)
+
 
 ### File serving
 
@@ -354,6 +366,7 @@ def serve_file(path):
     jobs_dir = config_value('jobs_dir')
     return flask.send_from_directory(jobs_dir, path)
 
+
 ### Path Completion
 
 @app.route('/autocomplete/path', methods=['GET'])
@@ -363,8 +376,8 @@ def path_autocomplete():
     Return a list of paths matching the specified preamble
 
     """
-    path = flask.request.args.get('query','')
-    suggestions = glob.glob(path+"*")
+    path = flask.request.args.get('query', '')
+    suggestions = glob.glob(path + "*")
     if platform.system() == 'Windows':
         # on windows, convert backslashes with forward slashes
         suggestions = [p.replace('\\', '/') for p in suggestions]
@@ -374,6 +387,7 @@ def path_autocomplete():
     }
 
     return json.dumps(result)
+
 
 ### SocketIO functions
 
@@ -386,12 +400,14 @@ def on_connect_home():
     """
     pass
 
+
 @socketio.on('disconnect', namespace='/home')
 def on_disconnect_home():
     """
     Somebody disconnected from the homepage
     """
     pass
+
 
 ## /jobs
 
@@ -402,12 +418,14 @@ def on_connect_jobs():
     """
     pass
 
+
 @socketio.on('disconnect', namespace='/jobs')
 def on_disconnect_jobs():
     """
     Somebody disconnected from a jobs page
     """
     pass
+
 
 @socketio.on('join', namespace='/jobs')
 def on_join_jobs(data):
@@ -418,6 +436,7 @@ def on_join_jobs(data):
     join_room(room)
     flask.session['room'] = room
 
+
 @socketio.on('leave', namespace='/jobs')
 def on_leave_jobs():
     """
@@ -426,6 +445,5 @@ def on_leave_jobs():
     if 'room' in flask.session:
         room = flask.session['room']
         del flask.session['room']
-        #print '>>> Somebody left room %s' % room
+        # print '>>> Somebody left room %s' % room
         leave_room(room)
-
