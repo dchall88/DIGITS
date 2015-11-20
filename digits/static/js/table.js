@@ -50,7 +50,7 @@
                 }
             }
         ]
-    }
+    };
 
     function getRange(data) {
         if (typeof data !== 'string') return '';
@@ -120,4 +120,4 @@
         // to be a bug in dataTables.bootstrap(.min).js.
         $('#job_table_wrapper').removeClass('form-inline');
     });
-})($, window, document)
+})($, window, document);

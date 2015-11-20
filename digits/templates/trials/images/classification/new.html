@@ -79,19 +79,18 @@ New Image Classification Trial
     <script>
     $("#learning_method").change(function () {
         if(this.value == 'dnn'){
-            $("#layers").hide()
-            $("#svm_params").hide()
+            $("#layers").hide();
+            $("#svm_params").hide();
             $("#boost_params").hide()
         } else if(this.value == 'svm'){
-            $("#layers").show()
-            $("#svm_params").show()
+            $("#layers").show();
+            $("#svm_params").show();
             $("#boost_params").hide()
         } else if(this.value == 'adaboost'){
-            $("#layers").show()
-            $("#svm_params").hide()
+            $("#layers").show();
+            $("#svm_params").hide();
             $("#boost_params").show()
-        };
-        
+        }
     });
     </script>
 

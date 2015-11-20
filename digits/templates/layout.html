@@ -56,7 +56,7 @@ window.onload = function () {
        {
             function baseName(str)
             {
-               var base = new String(str).substring(str.lastIndexOf('/') + 1);
+               var base = String(str).substring(str.lastIndexOf('/') + 1);
                return base;
             }
             return baseName(suggestion.value);

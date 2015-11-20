@@ -355,7 +355,8 @@ var io = ('undefined' === typeof module ? {} : module.exports);
    */
 
   util.inherit = function (ctor, ctor2) {
-    function f() {};
+    function f() {
+    }
     f.prototype = ctor2.prototype;
     ctor.prototype = new f;
   };
@@ -391,7 +392,7 @@ var io = ('undefined' === typeof module ? {} : module.exports);
     }
 
     return ret;
-  }
+  };
 
   /**
    * Array indexOf compatibility.
@@ -487,8 +488,9 @@ var io = ('undefined' === typeof module ? {} : module.exports);
    * @api public.
    */
 
-  function EventEmitter () {};
 
+  function EventEmitter() {
+  }
   /**
    * Adds a listener
    *
@@ -525,8 +527,7 @@ var io = ('undefined' === typeof module ? {} : module.exports);
     function on () {
       self.removeListener(name, on);
       fn.apply(this, arguments);
-    };
-
+    }
     on.listener = fn;
     this.on(name, on);
 
@@ -687,8 +688,7 @@ var io = ('undefined' === typeof module ? {} : module.exports);
         f(d.getUTCHours())     + ':' +
         f(d.getUTCMinutes())   + ':' +
         f(d.getUTCSeconds())   + 'Z' : null;
-  };
-
+  }
   var cx = /[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
       escapable = /[\\\"\x00-\x1f\x7f-\x9f\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
       gap,
@@ -1197,8 +1197,7 @@ var io = ('undefined' === typeof module ? {} : module.exports);
       case 'disconnect':
       case 'heartbeat':
         break;
-    };
-
+    }
     return packet;
   };
 
@@ -1258,8 +1257,7 @@ var io = ('undefined' === typeof module ? {} : module.exports);
   function Transport (socket, sessid) {
     this.socket = socket;
     this.sessid = sessid;
-  };
-
+  }
   /**
    * Apply EventEmitter mixin.
    */
@@ -1363,7 +1361,7 @@ var io = ('undefined' === typeof module ? {} : module.exports);
   Transport.prototype.onConnect = function () {
     this.socket.onConnect();
     return this;
-  }
+  };
 
   /**
    * Clears close timeout
@@ -1541,8 +1539,7 @@ var io = ('undefined' === typeof module ? {} : module.exports);
     if (this.options['auto connect']) {
       this.connect();
     }
-};
-
+  }
   /**
    * Apply EventEmitter mixin.
    */
@@ -1592,8 +1589,9 @@ var io = ('undefined' === typeof module ? {} : module.exports);
    * @api private
    */
 
-  function empty () { };
 
+  function empty() {
+  }
   Socket.prototype.handshake = function (fn) {
     var self = this
       , options = this.options;
@@ -1605,8 +1603,7 @@ var io = ('undefined' === typeof module ? {} : module.exports);
       } else {
         fn.apply(null, data.split(':'));
       }
-    };
-
+    }
     var url = [
           'http' + (options.secure ? 's' : '') + ':/'
         , options.host + ':' + options.port
@@ -1982,8 +1979,7 @@ var io = ('undefined' === typeof module ? {} : module.exports);
       delete self.redoTransports;
 
       self.options['try multiple transports'] = tryMultiple;
-    };
-
+    }
     function maybeReconnect () {
       if (!self.reconnecting) {
         return;
@@ -1991,8 +1987,7 @@ var io = ('undefined' === typeof module ? {} : module.exports);
 
       if (self.connected) {
         return reset();
-      };
-
+      }
       if (self.connecting && self.reconnecting) {
         return self.reconnectionTimer = setTimeout(maybeReconnect, 1000);
       }
@@ -2017,8 +2012,7 @@ var io = ('undefined' === typeof module ? {} : module.exports);
         self.publish('reconnecting', self.reconnectionDelay, self.reconnectionAttempts);
         self.reconnectionTimer = setTimeout(maybeReconnect, self.reconnectionDelay);
       }
-    };
-
+    }
     this.options['try multiple transports'] = false;
     this.reconnectionTimer = setTimeout(maybeReconnect, this.reconnectionDelay);
 
@@ -2058,8 +2052,7 @@ var io = ('undefined' === typeof module ? {} : module.exports);
     this.json = new Flag(this, 'json');
     this.ackPackets = 0;
     this.acks = {};
-  };
-
+  }
   /**
    * Apply EventEmitter mixin.
    */
@@ -2177,8 +2170,7 @@ var io = ('undefined' === typeof module ? {} : module.exports);
         , args: io.util.toArray(arguments)
         , ackId: packet.id
       });
-    };
-
+    }
     switch (packet.type) {
       case 'connect':
         this.$emit('connect');
@@ -2244,8 +2236,7 @@ var io = ('undefined' === typeof module ? {} : module.exports);
   function Flag (nsp, name) {
     this.namespace = nsp;
     this.name = name;
-  };
-
+  }
   /**
    * Send a message
    *
@@ -2300,8 +2291,7 @@ var io = ('undefined' === typeof module ? {} : module.exports);
 
   function WS (socket) {
     io.Transport.apply(this, arguments);
-  };
-
+  }
   /**
    * Inherits from Transport.
    */
@@ -2327,7 +2317,7 @@ var io = ('undefined' === typeof module ? {} : module.exports);
   WS.prototype.open = function () {
     var query = io.util.query(this.socket.options.query)
       , self = this
-      , Socket
+      , Socket;
 
 
     if (!Socket) {
@@ -2492,8 +2482,7 @@ var io = ('undefined' === typeof module ? {} : module.exports);
 
   function Flashsocket () {
     io.Transport.websocket.apply(this, arguments);
-  };
-
+  }
   /**
    * Inherits from Transport.
    */
@@ -3038,8 +3027,7 @@ var swfobject=function(){var D="undefined",r="object",S="Shockwave Flash",W="Sho
 
     io.Transport.apply(this, arguments);
     this.sendBuffer = [];
-  };
-
+  }
   /**
    * Inherits from Transport.
    */
@@ -3102,8 +3090,9 @@ var swfobject=function(){var D="undefined",r="object",S="Shockwave Flash",W="Sho
    * @api private
    */
 
-  function empty () { };
 
+  function empty() {
+  }
   XHR.prototype.post = function (data) {
     var self = this;
     this.socket.setBuffer(true);
@@ -3124,8 +3113,7 @@ var swfobject=function(){var D="undefined",r="object",S="Shockwave Flash",W="Sho
     function onload () {
       this.onload = empty;
       self.socket.setBuffer(false);
-    };
-
+    }
     this.sendXHR = this.request('POST');
 
     if (global.XDomainRequest && this.sendXHR instanceof XDomainRequest) {
@@ -3253,8 +3241,7 @@ var swfobject=function(){var D="undefined",r="object",S="Shockwave Flash",W="Sho
 
   function HTMLFile (socket) {
     io.Transport.XHR.apply(this, arguments);
-  };
-
+  }
   /**
    * Inherits from XHR transport.
    */
@@ -3422,8 +3409,7 @@ var swfobject=function(){var D="undefined",r="object",S="Shockwave Flash",W="Sho
 
   function XHRPolling () {
     io.Transport.XHR.apply(this, arguments);
-  };
-
+  }
   /**
    * Inherits from XHR transport.
    */
@@ -3465,8 +3451,9 @@ var swfobject=function(){var D="undefined",r="object",S="Shockwave Flash",W="Sho
    * @api private
    */
 
-  function empty () {};
 
+  function empty() {
+  }
   XHRPolling.prototype.get = function () {
     if (!this.open) return;
 
@@ -3483,19 +3470,16 @@ var swfobject=function(){var D="undefined",r="object",S="Shockwave Flash",W="Sho
           self.onClose();
         }
       }
-    };
-
+    }
     function onload () {
       this.onload = empty;
       this.onerror = empty;
       self.onData(this.responseText);
       self.get();
-    };
-
+    }
     function onerror () {
       self.onClose();
-    };
-
+    }
     this.xhr = this.request();
 
     if (global.XDomainRequest && this.xhr instanceof XDomainRequest) {
@@ -3604,8 +3588,7 @@ var swfobject=function(){var D="undefined",r="object",S="Shockwave Flash",W="Sho
     io.j.push(function (msg) {
       self._(msg);
     });
-  };
-
+  }
   /**
    * Inherits from XHR polling transport.
    */
@@ -3664,8 +3647,7 @@ var swfobject=function(){var D="undefined",r="object",S="Shockwave Flash",W="Sho
     function complete () {
       initIframe();
       self.socket.setBuffer(false);
-    };
-
+    }
     function initIframe () {
       if (self.iframe) {
         self.form.removeChild(self.iframe);
@@ -3683,8 +3665,7 @@ var swfobject=function(){var D="undefined",r="object",S="Shockwave Flash",W="Sho
 
       self.form.appendChild(iframe);
       self.iframe = iframe;
-    };
-
+    }
     initIframe();
 
     // we temporarily stringify until we figure out how to prevent
@@ -3734,7 +3715,7 @@ var swfobject=function(){var D="undefined",r="object",S="Shockwave Flash",W="Sho
       self.onClose();
     };
 
-    var insertAt = document.getElementsByTagName('script')[0]
+    var insertAt = document.getElementsByTagName('script')[0];
     insertAt.parentNode.insertBefore(script, insertAt);
     this.script = script;
 

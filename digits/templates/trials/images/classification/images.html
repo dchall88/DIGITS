@@ -50,9 +50,9 @@ Display Results
                    $("#miss-list").html(
                      "{% for predicted_label, score, key, index in miss_results1  %} <dt>" + (10*(num-1)+{{loop.index}}) + ". Predicted Label = {{ predicted_label }}, Score = {{'%0.2f' % score|float}}, Index = {{index}}, Key = {{key}} </dt>\ <dd> <img src='{{ url_for('display_images', job_id=job.experiment.dataset_id, key=key) }}' alt='Image Placeholder' height='100'> </dd>\ {% endfor %}"
                      );
-                }; 
+            }
             {% endfor %}            
-        });
+        });;
     </script>
         
                </div>    
@@ -83,9 +83,9 @@ Display Results
                    $("#hit-list").html(
                      "{% for score, key, index in hit_results1  %} <dt>" + (10*(num-1)+{{loop.index}}) + ". Score = {{'%0.2f' % score|float}}, Index = {{index}} </dt>\ <dd> <img src='{{ url_for('display_images', job_id=job.experiment.dataset_id, key=key) }}' alt='Image Placeholder' height='100'> </dd>\ {% endfor %}"
                      );
-                }; 
+            }
             {% endfor %}            
-        });
+        });;
     </script>
         
                 </div>    
